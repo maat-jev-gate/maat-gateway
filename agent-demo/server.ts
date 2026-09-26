@@ -59,18 +59,10 @@ app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay
   const call = scenario.calls[index];
   const recipient = scenario.id === "payment-risk" ? riskPayTo : scenario.id === "payment-block" ? verifyPayTo : payTo;
   if (scenario.id === "payment-risk" && !recipient) return reply.code(409).send({ error: "AGENT_RISK_PAY_TO is not configured." });
-  if (scenario.id === "payment-escalate") {
-    const settingsResponse = await gatewayRequest("/api/maat/settings");
-    if (!settingsResponse.ok) return forward(settingsResponse, reply);
-    const settings = await settingsResponse.json() as { bypassJev?: boolean; jevBypassVerdict?: string };
-    if (!settings.bypassJev || settings.jevBypassVerdict !== "ESCALATE") {
-      return reply.code(409).send({ error: "For this scenario, enable Bypass JEV and select Escalate in the Gateway Debug Panel." });
-    }
-  }
   const response = await gatewayRequest(gatewayPaths.pay, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.task, purpose: call.purpose, payTo: recipient || undefined, taskId: `demo-${scenario.id}` }),
+    body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.task, purpose: call.purpose, payTo: recipient || undefined, taskId: `demo-${scenario.id}`, ...(scenario.id === "payment-escalate" ? { demoEscalate: true } : {}) }),
   });
   return forward(response, reply);
 });

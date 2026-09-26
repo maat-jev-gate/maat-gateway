@@ -12,6 +12,7 @@ import { isAddress, type Hex } from "viem";
 import { gatewaySettings, updateGatewaySettings, type GatewaySettings } from "./settings";
 import { checkPaymentRisk, type RiskCheck } from "./intercepta";
 import { screenSwap, SwapGuardError, type SwapIntent } from "./swap-guard";
+import { isPendingApproval, type ApprovalStatus } from "./approval";
 
 config();
 
@@ -24,6 +25,7 @@ type PayRequest = {
   authorization?: string;
   taskId: string;
   bypassJev?: boolean;
+  demoEscalate?: boolean;
 };
 
 type DemoScenario = "allow" | "block" | "escalate";
@@ -35,7 +37,7 @@ type Decision = {
   taskId: string;
   kind: "pay";
   verdict: "ALLOW" | "BLOCK" | "ESCALATE";
-  decidedBy: "jev" | "gateway" | "fallback" | "error" | "intercepta";
+  decidedBy: "jev" | "gateway" | "fallback" | "error" | "intercepta" | "demo";
   confidence?: number;
   probability?: number;
   reasons: string[];
@@ -49,7 +51,7 @@ type Decision = {
   intentHash?: string;
   demo?: boolean;
   paymentExecuted?: boolean;
-  paymentStatus?: "pending" | "completed" | "failed";
+  paymentStatus?: "pending" | "completed" | "failed" | "cancelled";
 };
 
 type Approval = {
@@ -57,7 +59,7 @@ type Approval = {
   decisionId: string;
   intentHash: string;
   input: PayRequest;
-  status: "pending" | "approved" | "rejected" | "expired";
+  status: ApprovalStatus;
   createdAt: string;
   expiresAt: string;
   releasedResponse?: unknown;
@@ -330,8 +332,7 @@ async function evaluateWithJev(input: PayRequest, merchant: Partial<MerchantResu
 
 app.get("/health", async () => ({ ok: true, service: "maat-gateway", decisions: decisions.length }));
 app.get("/api/maat/decisions", async () => ({ decisions: decisions.map(publicDecision) }));
-app.delete("/api/maat/history", async (request, reply) => {
-  if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
+app.delete("/api/maat/history", async () => {
   decisions.length = 0;
   approvals.clear();
   worldAttempts.clear();
@@ -347,7 +348,6 @@ app.get("/api/world/config", async () => ({ configured: worldConfigured, issuer:
 app.get("/api/maat/settings", async () => ({ ...gatewaySettings }));
 app.post<{ Body: Partial<GatewaySettings> }>("/api/maat/settings", async (request) => updateGatewaySettings(request.body ?? {}));
 app.post<{ Body: { scenario?: DemoScenario; purpose?: string } }>("/api/maat/demo", async (request, reply) => {
-  if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
   const scenario = request.body?.scenario;
   if (!scenario) return reply.code(400).send({ error: "scenario must be allow, block, or escalate." });
   const verdict: Verdict = scenario === "allow" ? "ALLOW" : scenario === "block" ? "BLOCK" : "ESCALATE";
@@ -389,12 +389,28 @@ app.get<{ Params: { id: string } }>("/api/maat/approvals/:id", async (request, r
   return approval;
 });
 
+app.post<{ Params: { id: string } }>("/api/maat/approvals/:id/cancel", async (request, reply) => {
+  const approval = approvals.get(request.params.id);
+  if (!approval) return reply.code(404).send({ error: "Approval not found." });
+  if (!isPendingApproval(approval)) return reply.code(409).send({ error: "This approval is no longer pending." });
+  approval.status = "cancelled";
+  const decision = decisions.find((item) => item.id === approval.decisionId);
+  if (decision) {
+    decision.paymentStatus = "cancelled";
+    decision.reasons.push("Payment cancelled before World ID approval; nothing was signed.");
+  }
+  for (const [state, attempt] of worldAttempts) {
+    if (attempt.approvalId === approval.id) worldAttempts.delete(state);
+  }
+  saveHistory();
+  return approval;
+});
+
 app.post<{ Params: { id: string } }>("/api/maat/approvals/:id/resolve", async (request, reply) => {
-  if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
   if (!gatewaySettings.bypassWorldId) return reply.code(409).send({ error: "World ID bypass is not enabled." });
   const approval = approvals.get(request.params.id);
   if (!approval) return reply.code(404).send({ error: "Approval not found." });
-  if (approval.status !== "pending") return approval;
+  if (!isPendingApproval(approval)) return reply.code(409).send({ error: "This approval is no longer pending." });
   const approved = gatewaySettings.worldBypassVerdict === "ALLOW";
   approval.status = approved ? "approved" : "rejected";
   const decision = decisions.find((item) => item.id === approval.decisionId);
@@ -425,6 +441,7 @@ app.post<{ Params: { id: string } }>("/api/maat/approvals/:id/resolve", async (r
 app.get<{ Params: { id: string } }>("/api/maat/approvals/:id/world/start", async (request, reply) => {
   const approval = approvals.get(request.params.id);
   if (!approval) return reply.code(404).send({ error: "Approval not found." });
+  if (!isPendingApproval(approval)) return reply.code(409).send({ error: "This approval is no longer pending." });
   if (gatewaySettings.bypassWorldId) return reply.code(409).send({ error: "World ID bypass is enabled; resolve the approval from the Gateway console." });
   if (!worldConfigured) return reply.code(503).send({ error: "WORLD_CLIENT_ID and WORLD_CLIENT_SECRET are not configured." });
   const state = newToken();
@@ -446,7 +463,7 @@ app.get<{ Querystring: { code?: string; state?: string; error?: string; error_de
     return reply.type("text/html; charset=utf-8").header("Cache-Control", "no-store").send(worldResultPage("failure", message));
   };
   if (error || !code || !state || !attempt) return failure(errorDescription || error || "The World ID verification session expired.");
-  if (!approval || approval.intentHash !== attempt.intentHash) return failure("The approval request could not be matched to this verification.");
+  if (!approval || approval.intentHash !== attempt.intentHash || !isPendingApproval(approval)) return failure("This approval is no longer pending.");
   try {
     const metadata = await worldDiscovery();
     const tokenResponse = await fetch(metadata.token_endpoint, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${Buffer.from(`${worldClientId}:${worldClientSecret}`).toString("base64")}` }, body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: worldRedirectUri, code_verifier: attempt.verifier }) });
@@ -455,6 +472,7 @@ app.get<{ Querystring: { code?: string; state?: string; error?: string; error_de
     if (!tokens.id_token) throw new Error("World did not return an ID token.");
     const claims = await verifyWorldToken(tokens.id_token, attempt.nonce);
     if (!claims.sub) throw new Error("Verified World identity has no subject.");
+    if (!isPendingApproval(approval)) return failure("This approval is no longer pending.");
     approval.status = "approved";
     if (approval.demo) approval.releasedResponse = { demo: true, message: "Simulated approval released." };
     else {
@@ -495,6 +513,9 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
   if (!input || typeof input.agentId !== "string" || typeof input.url !== "string" || typeof input.method !== "string" || typeof input.purpose !== "string" || typeof input.taskId !== "string" || (input.payTo !== undefined && !isAddress(input.payTo))) {
     return reply.code(400).send({ error: "agentId, url, method, purpose, and taskId are required." });
   }
+  if (input.demoEscalate !== undefined && (input.demoEscalate !== true || input.agentId !== "maat-demo-agent" || input.taskId !== "demo-payment-escalate")) {
+    return reply.code(400).send({ error: "demoEscalate is available only for the payment approval demo." });
+  }
   const totalStartedAt = performance.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Number(process.env.MERCHANT_TIMEOUT_MS ?? 15000));
@@ -522,6 +543,10 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
     } else if (risk && risk.status !== "clear") {
       verdict = "BLOCK";
       decidedBy = "intercepta";
+    } else if (input.demoEscalate) {
+      verdict = "ESCALATE";
+      decidedBy = "demo";
+      reasons.push("The Agent requested the approval demo; JEV was skipped for this decision.");
     } else if (bypassJev) {
       verdict = gatewaySettings.jevBypassVerdict;
       decidedBy = "fallback";

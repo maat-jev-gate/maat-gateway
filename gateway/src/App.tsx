@@ -1,21 +1,11 @@
 import { useEffect, useState } from "react";
+import { formatUnits } from "viem";
 
 type Settings = { bypassJev: boolean; bypassRealPayment: boolean; bypassWorldId: boolean; bypassMerchantRequest: boolean; jevBypassVerdict: "ALLOW" | "BLOCK" | "ESCALATE"; worldBypassVerdict: "ALLOW" | "BLOCK"; merchantUrl: string };
-type Decision = { id: string; createdAt: string; agentId: string; taskId: string; verdict: "ALLOW" | "BLOCK" | "ESCALATE"; probability?: number; reasons: string[]; intent: { url: string; method: string; purpose: string }; merchant: { status?: number }; timings: { totalMs: number; merchantMs?: number; jevMs?: number; interceptaMs?: number }; intercepta?: { status: "clear" | "blocked" | "unavailable"; reasons: string[]; scans: { kind: "address" | "token"; address: string; response: unknown }[] }; decidedBy: string; error?: string; approvalId?: string; paymentExecuted?: boolean; paymentStatus?: "pending" | "completed" | "failed"; demo?: boolean };
-type Approval = { id: string; status: "pending" | "approved" | "rejected" | "expired"; expiresAt: string; releasedResponse?: unknown };
+type Decision = { id: string; createdAt: string; agentId: string; taskId: string; verdict: "ALLOW" | "BLOCK" | "ESCALATE"; probability?: number; reasons: string[]; intent: { url: string; method: string; purpose: string }; merchant: { status?: number; requirements?: { amount: string; payTo: string; extra?: { name?: string } }[] }; timings: { totalMs: number; merchantMs?: number; jevMs?: number; interceptaMs?: number }; intercepta?: { status: "clear" | "blocked" | "unavailable"; reasons: string[]; scans: { kind: "address" | "token"; address: string; response: unknown }[] }; decidedBy: string; error?: string; approvalId?: string; paymentExecuted?: boolean; paymentStatus?: "pending" | "completed" | "failed" | "cancelled"; demo?: boolean };
+type Approval = { id: string; status: "pending" | "approved" | "rejected" | "expired" | "cancelled"; expiresAt: string; releasedResponse?: unknown };
 
 const emptySettings: Settings = { bypassJev: false, bypassRealPayment: false, bypassWorldId: false, bypassMerchantRequest: false, jevBypassVerdict: "ESCALATE", worldBypassVerdict: "ALLOW", merchantUrl: "https://merchant.maat-jev-gate.online/vendor/atlas/dataset/demo-1" };
-let gatewayCredentials = "";
-function gatewayAuth() {
-  if (gatewayCredentials) return gatewayCredentials;
-  const user = window.prompt("Gateway username", "demo-agent");
-  if (user === null) throw new Error("Gateway authentication was cancelled.");
-  const password = window.prompt("Gateway password");
-  if (password === null) throw new Error("Gateway authentication was cancelled.");
-  gatewayCredentials = `Basic ${btoa(`${user}:${password}`)}`;
-  return gatewayCredentials;
-}
-
 export function App() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [settings, setSettings] = useState<Settings>(emptySettings);
@@ -60,8 +50,7 @@ export function App() {
   async function clearHistory() {
     setError(""); setNotice("");
     try {
-      const response = await fetch("/api/maat/history", { method: "DELETE", headers: { Authorization: gatewayAuth() } });
-      if (response.status === 401) gatewayCredentials = "";
+      const response = await fetch("/api/maat/history", { method: "DELETE" });
       if (!response.ok) throw new Error("Gateway history could not be cleared.");
       setDecisions([]); setApprovals({}); setConfirmClear(false); setNotice("Gateway history cleared.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Gateway history could not be cleared."); }
@@ -70,8 +59,7 @@ export function App() {
   async function runDemo(scenario: "allow" | "block" | "escalate") {
     setRunning(true); setError(""); setNotice("");
     try {
-      const response = await fetch("/api/maat/demo", { method: "POST", headers: { Authorization: gatewayAuth(), "Content-Type": "application/json" }, body: JSON.stringify({ scenario, purpose: demoPurpose }) });
-      if (response.status === 401) gatewayCredentials = "";
+      const response = await fetch("/api/maat/demo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario, purpose: demoPurpose }) });
       if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Demo Merchant request failed.");
       await refresh();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Demo request failed."); }
@@ -81,8 +69,7 @@ export function App() {
   async function resolveApproval(approvalId: string) {
     if (settings.bypassWorldId) {
       try {
-        const response = await fetch(`/api/maat/approvals/${approvalId}/resolve`, { method: "POST", headers: { Authorization: gatewayAuth() } });
-        if (response.status === 401) gatewayCredentials = "";
+        const response = await fetch(`/api/maat/approvals/${approvalId}/resolve`, { method: "POST" });
         if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Approval could not be resolved.");
         await refresh();
       } catch (caught) { setError(caught instanceof Error ? caught.message : "Approval could not be resolved."); }
@@ -91,12 +78,34 @@ export function App() {
     const popup = window.open(`/api/maat/approvals/${approvalId}/world/start`, "maat-world-approval", "popup,width=480,height=760");
     if (!popup) setError("World ID could not open. Allow pop-ups for this Gateway page and try again.");
   }
+  async function cancelApproval(approvalId: string) {
+    setError("");
+    try {
+      const response = await fetch(`/api/maat/approvals/${approvalId}/cancel`, { method: "POST" });
+      if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Approval could not be cancelled.");
+      await refresh();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Approval could not be cancelled."); }
+  }
   useEffect(() => { void loadSettings(); void refresh(); const timer = window.setInterval(() => void refresh(), 2000); return () => window.clearInterval(timer); }, []);
 
   function renderDecision(decision: Decision) {
     const approval = decision.approvalId ? approvals[decision.approvalId] : undefined;
     const paymentLabel = decision.paymentStatus ?? (decision.paymentExecuted ? "completed" : "dry run");
-    return <article className={`decision ${decision.verdict.toLowerCase()}`} key={decision.id}><div className="decision-top"><div><span className="decision-kicker">{decision.verdict} · {decision.decidedBy.toUpperCase()}{decision.demo ? " · DEMO" : ""}</span><h2>{decision.intent.method} {decision.intent.url}</h2></div><strong>{decision.probability === undefined ? "—" : `${Math.round(decision.probability * 100)}%`}</strong></div><p className="purpose">{decision.intent.purpose}</p><div className="metrics"><span>Intercepta {decision.intercepta?.status ?? "—"} · {decision.timings.interceptaMs ?? "—"} ms</span><span>JEV {decision.timings.jevMs ?? "—"} ms</span><span>Merchant {decision.timings.merchantMs ?? "—"} ms</span><span>Total {decision.timings.totalMs} ms</span><span>Payment {paymentLabel}</span><span>{new Date(decision.createdAt).toLocaleTimeString()}</span></div>{decision.reasons.map((reason, index) => <div className={`reason${index ? " secondary-reason" : ""}`} key={`${index}-${reason}`}>{reason}</div>)}{decision.intercepta && <details><summary>Intercepta scan results</summary><pre>{JSON.stringify(decision.intercepta.scans, null, 2)}</pre></details>}{decision.approvalId && <div className="approval"><span>WORLD ID · {approval?.status ?? "pending"}</span>{approval?.status === "pending" && <button type="button" onClick={() => void resolveApproval(decision.approvalId!)}>{settings.bypassWorldId ? "Resolve approval" : "Approve with World ID ↗"}</button>}{approval?.status === "approved" && <strong>Approval accepted</strong>}{approval?.status === "rejected" && <strong>Approval rejected</strong>}</div>}</article>;
+    const requirement = decision.merchant.requirements?.[0];
+    const amount = requirement?.extra?.name === "USDC" && /^\d+$/.test(requirement.amount)
+      ? `${formatUnits(BigInt(requirement.amount), 6)} USDC` : undefined;
+    return <article className={`decision ${decision.verdict.toLowerCase()}`} key={decision.id}>
+      <div className="decision-top"><div><span className="decision-kicker">{decision.verdict} · {decision.decidedBy.toUpperCase()}{decision.demo ? " · DEMO" : ""}</span><h2>{decision.intent.method} {decision.intent.url}</h2></div><strong>{decision.probability === undefined ? "—" : `${Math.round(decision.probability * 100)}%`}</strong></div>
+      <p className="purpose">{decision.intent.purpose}</p>
+      <div className="metrics"><span>Intercepta {decision.intercepta?.status ?? "—"} · {decision.timings.interceptaMs ?? "—"} ms</span><span>JEV {decision.timings.jevMs ?? "—"} ms</span><span>Merchant {decision.timings.merchantMs ?? "—"} ms</span><span>Total {decision.timings.totalMs} ms</span><span>Payment {paymentLabel}</span><span>{new Date(decision.createdAt).toLocaleTimeString()}</span></div>
+      {decision.reasons.map((reason, index) => <div className={`reason${index ? " secondary-reason" : ""}`} key={`${index}-${reason}`}>{reason}</div>)}
+      {decision.intercepta && <details><summary>Intercepta scan results</summary><pre>{JSON.stringify(decision.intercepta.scans, null, 2)}</pre></details>}
+      {decision.approvalId && <div className="approval">
+        <div className="approval-summary"><span>APPROVAL · {approval?.status ?? "pending"}</span>{requirement && <div>{amount && <span>{amount} · </span>}Recipient <code>{requirement.payTo}</code></div>}</div>
+        {approval?.status === "pending" && <div className="approval-actions"><button type="button" onClick={() => void resolveApproval(decision.approvalId!)}>{settings.bypassWorldId ? "Resolve approval" : "Confirm with World ID"}</button><button className="cancel-approval" type="button" onClick={() => void cancelApproval(decision.approvalId!)}>Cancel payment</button></div>}
+        {approval?.status === "approved" && <strong>Approval accepted</strong>}{approval?.status === "rejected" && <strong>Approval rejected</strong>}{approval?.status === "cancelled" && <strong>Payment cancelled</strong>}{approval?.status === "expired" && <strong>Approval expired</strong>}
+      </div>}
+    </article>;
   }
 
   return <main className="shell">

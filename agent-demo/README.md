@@ -7,7 +7,7 @@ The Agent interface presents six independent scenes from the demo script:
 | Accept dataset purchase | `POST /api/maat/pay` | Buys one $0.001 dataset and displays the returned rows. |
 | Block verification fee | `POST /api/maat/pay` | Sends the Merchant's $80 verification request for a Gateway decision. |
 | Block risky recipient | `POST /api/maat/pay` | Requests a $0.001 x402 resource whose Merchant quote uses the configured risk recipient. Intercepta decides whether it is blocked. |
-| Approve dataset purchase | `POST /api/maat/pay` | Buys one $0.001 dataset after a Gateway operator enables JEV bypass with the ESCALATE result and a human approves it. |
+| Approve dataset purchase | `POST /api/maat/pay` | Requests a labeled demo escalation for one $0.001 dataset; payment follows World ID approval. |
 | Review ETH-to-USDC swap | `POST /api/maat/swap` | Requests a $30 mainnet analysis and displays the Guard's live verdict. No trade or approval flow runs. |
 | Screen a social token | `POST /api/maat/swap` | Requests a live ETH-to-PEPE analysis and displays the Guard's verdict and quote. No trade runs. |
 
@@ -15,7 +15,7 @@ The browser calls only the Agent service's same-origin `/api/demo/scenarios/*` r
 
 The Agent's `payTo` parameter names the intended recipient. Set `AGENT_PAY_TO` for dataset purchases, `AGENT_VERIFY_PAY_TO` for the $80 verification service, and `AGENT_RISK_PAY_TO` for the risk scene. The verification address falls back to `AGENT_PAY_TO` when unset. The Gateway compares this parameter with the Merchant's signed-payment destination from the 402 quote and blocks a mismatch. For the risk scene, set `MERCHANT_RISK_PAY_TO` in the Merchant's ignored `.env` to the same address. The risk button remains unavailable until the Agent address is configured. Use a known-risk mainnet address from Intercepta's pinned ETHGlobal Discord message; the payment itself remains on Base Sepolia.
 
-The approval scene uses the Gateway Debug Panel's existing **Bypass JEV** and **JEV bypass result: Escalate** settings. This produces a labeled fallback decision, not a JEV model result. The Agent rejects this scene when those settings are not enabled. After an approval, the Agent polls the original decision and shows the purchased data only after the Merchant payment completes. World ID must be configured on the Gateway for that approval to proceed.
+The approval scene sends `demoEscalate: true` for its fixed Agent and task ID. The Gateway still checks the Merchant quote and Intercepta before returning an `ESCALATE` decision labeled `demo`; JEV is skipped for this scene. The Gateway console can confirm with World ID or cancel without payment. After approval, the Agent polls the original decision and shows the purchased data only after the Merchant payment completes. World ID must be configured on the Gateway for confirmation to proceed.
 
 The current Agent adapter makes direct HTTP tool calls. An MCP server could expose the same `maat_pay` and `maat_swap` operations to general-purpose agents; this demo does not claim to use MCP today.
 

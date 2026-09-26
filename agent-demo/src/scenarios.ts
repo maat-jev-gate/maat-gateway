@@ -26,7 +26,7 @@ export const scenarios = [
     id: "payment-escalate",
     title: "Approve dataset purchase",
     service: "x402 pay + World ID",
-    task: "Purchase one Atlas dataset for $0.001. Gateway operator selected an ESCALATE fallback for this demonstration.",
+    task: "Purchase one Atlas dataset for $0.001 with human approval before payment.",
     calls: [{ label: "Atlas dataset", path: "/vendor/atlas/dataset/beta", method: "GET", purpose: "Purchase one Atlas dataset for 0.001 USDC", amountUsd: 0.001 }],
   },
   {

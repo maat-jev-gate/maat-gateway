@@ -85,7 +85,9 @@ For a blocked demo, use a mainnet address from the pinned Intercepta channel in 
 
 An `ESCALATE` response has HTTP `202`, an `approvalId`, and an `intentHash`. The original intent is stored server-side. The browser polls `GET /api/maat/approvals/:id`; it never decides whether a request is approved.
 
-Gateway decisions and approvals are saved to the local, Git-ignored `data/history.json` file in development and production. The console's **Clear History** action asks for confirmation and then calls the authenticated `DELETE /api/maat/history` endpoint. It removes saved decisions and approvals without changing Gateway settings or Merchant records.
+The fixed Agent approval scene sends `demoEscalate: true`, scoped to `maat-demo-agent` and task `demo-payment-escalate`. After the live Merchant and Intercepta checks, the Gateway returns a decision labeled `demo` without calling JEV. The pending card offers World ID confirmation and `POST /api/maat/approvals/:id/cancel`; cancellation records `cancelled` and prevents a later World callback from releasing the payment.
+
+Gateway decisions and approvals are saved to the local, Git-ignored `data/history.json` file in development and production. The console's **Clear History** action asks for confirmation and then calls `DELETE /api/maat/history`. It removes saved decisions and approvals without changing Gateway settings or Merchant records.
 
 ## World ID approval
 
@@ -124,7 +126,7 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 
 | Variable | Purpose |
 | --- | --- |
-| `GATEWAY_BASIC_USER` / `GATEWAY_BASIC_PASSWORD` | Server-side credentials required by Agent requests and authenticated Gateway console actions |
+| `GATEWAY_BASIC_USER` / `GATEWAY_BASIC_PASSWORD` | Server-side credentials required by Agent payment and swap requests |
 | `MAAT_TREASURY_PRIVATE_KEY` | Server-only 32-byte hex private key used to sign x402 payments |
 | `INTERCEPTA_API_KEY` | Server-only Intercepta key; required for real x402 payments |
 | `INTERCEPTA_API_URL` / `INTERCEPTA_CACHE` | Optional API base URL and ten-minute response cache control |
@@ -142,9 +144,9 @@ The Agent supplies `purpose` on every payment request. The Gateway console keeps
 
 Agents may also send `payTo` as their intended recipient. The Gateway blocks the request when it differs from the Merchant's `payTo` in the x402 quote. The risk-recipient Agent scene supplies this field from its server-only environment; the Merchant quotes the same address from its own environment.
 
-The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. `Apply settings` sends the complete configuration to `POST /api/maat/settings` without a password; the server returns the authoritative configuration and the UI replaces its local copy with that response. Other authenticated console actions prompt the operator for Gateway credentials and keep them only in page memory. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
+The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. `Apply settings` sends the complete configuration to `POST /api/maat/settings`; the server returns the authoritative configuration and the UI replaces its local copy with that response. Console actions do not prompt for credentials. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
 
-The three buttons under **DEMO REQUESTS** call authenticated `POST /api/maat/demo`. This route is isolated from the external Agent contract and always runs as a dry run. It accepts `allow`, `block`, or `escalate` to rehearse the three UI states without depending on JEV output. External Agents use `POST /api/maat/pay`, where verdicts come from JEV or the current Gateway settings. The Agent's approval scene uses the Debug Panel JEV bypass with an ESCALATE result; this setting must be turned off before demonstrating live JEV decisions again.
+The three buttons under **DEMO REQUESTS** call `POST /api/maat/demo`. This route is isolated from the external Agent contract and always runs as a dry run. It accepts `allow`, `block`, or `escalate` to rehearse the three UI states without depending on JEV output. External Agents use `POST /api/maat/pay`, where verdicts come from JEV, the current Gateway settings, or the labeled approval demo parameter.
 
 ## Verification
 
