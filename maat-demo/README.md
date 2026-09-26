@@ -1,6 +1,6 @@
 # Maat demo
 
-A three-column view for the public Maat demos. Each column has its own URL field and iframe. The Agent, Gateway, and Merchant pages load on startup. Focus a URL field to choose from the public demo URLs, or enter any HTTP or HTTPS URL and press Enter or leave the field.
+A three-column view for the public Maat demos. Each column has its own URL field and iframe. The Agent, Gateway, and Merchant pages load on startup. Focus a URL field to choose Agent, Gateway, Merchant, or Swap, or enter any HTTP or HTTPS URL and press Enter or leave the field.
 
 ## Run locally
 

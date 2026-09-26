@@ -4,7 +4,7 @@ const presets = [
   { name: "Agent", url: import.meta.env.VITE_AGENT_URL || "" },
   { name: "Gateway", url: import.meta.env.VITE_GATEWAY_URL || "" },
   { name: "Merchant", url: import.meta.env.VITE_MERCHANT_URL || "" },
-  { name: "World Demo", url: import.meta.env.VITE_WORLD_URL || "" },
+  { name: "Swap", url: import.meta.env.VITE_SWAP_URL || "" },
 ];
 
 const initialUrls = presets.slice(0, 3).map((preset) => preset.url);
