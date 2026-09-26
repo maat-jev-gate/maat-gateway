@@ -1,4 +1,4 @@
 gateway.maat-jev-gate.online {
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:8787
+	reverse_proxy 127.0.0.1:8793
 }
