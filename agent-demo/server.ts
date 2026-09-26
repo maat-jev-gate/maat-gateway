@@ -30,12 +30,12 @@ for (const [name, address] of [["AGENT_PAY_TO", payTo], ["AGENT_VERIFY_PAY_TO", 
 const gatewayAuth = `Basic ${Buffer.from(`${gatewayUser}:${gatewayPassword}`).toString("base64")}`;
 const app = Fastify({ logger: true, bodyLimit: 4_000 });
 
-async function gatewayRequest(path: string, init?: RequestInit) {
+async function gatewayRequest(path: string, init?: RequestInit, timeoutMs = 20_000) {
   try {
     return await fetch(new URL(path, gatewayUrl.origin), {
       ...init,
       headers: { accept: "application/json", ...init?.headers, authorization: gatewayAuth },
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw new Error("Gateway is unavailable.");
@@ -81,7 +81,7 @@ app.post<{ Params: { id: string } }>("/api/demo/scenarios/:id/swap", async (requ
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ agentId: "maat-demo-agent", taskId: `demo-${scenario.id}`, purpose: scenario.task, ...scenario.swap }),
-  });
+  }, 75_000);
   return forward(response, reply);
 });
 app.get<{ Params: { id: string } }>("/api/demo/decisions/:id", async (request, reply) => {

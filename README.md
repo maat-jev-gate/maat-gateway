@@ -60,7 +60,7 @@ If JEV is unavailable, the Gateway records a `fallback` decision using `JEV_FALL
 
 ## Current implementation boundary
 
-The Gateway provides Basic Auth, Merchant inspection, direct JEV calls, server-side x402 signing and settlement, decision polling, asynchronous World approval, and a single-column observer UI. The treasury key is configured only in the Gateway server environment.
+The Gateway provides Basic Auth, Merchant inspection, direct JEV calls for payments, server-side x402 signing and settlement, decision polling, asynchronous World approval, and a single-column observer UI. It forwards authenticated swap intents to the standalone Swap Guard and returns analysis decisions without executing trades. The treasury key is configured only in the Gateway server environment.
 
 See [`gateway/README.md`](gateway/README.md) for setup, environment variables, API behavior, and verification commands.
 

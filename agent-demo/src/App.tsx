@@ -3,7 +3,7 @@ import { scenarios, type Scenario } from "./scenarios";
 
 type PurchasedData = { id?: string; title?: string; rows?: { key: string; value: string }[]; payment?: { txHash?: string; demo?: boolean } };
 type TimelineItem = { kind: "task" | "activity" | "decision" | "result" | "error"; text: string; label?: string; amountUsd?: number; payTo?: string; verdict?: string; status?: string; elapsedMs?: number; data?: PurchasedData; approvalId?: string; decisionId?: string; decidedBy?: string; reasons?: string[] };
-type GatewayDecision = { id?: string; verdict?: string; paymentStatus?: string; error?: string; approvalId?: string; decidedBy?: string; reasons?: string[]; intent?: { payTo?: string }; merchant?: { status?: number; response?: PurchasedData } };
+type GatewayDecision = { id?: string; verdict?: string; paymentStatus?: string; error?: string; approvalId?: string; decidedBy?: string; reasons?: string[]; analysisOnly?: boolean; quote?: { route?: string; priceImpactPct?: number | null }; intent?: { payTo?: string }; merchant?: { status?: number; response?: PurchasedData } };
 type GatewayInfo = { url: string; endpoints: { pay: string; swap: string }; riskReady: boolean; riskPayTo: string | null };
 
 export function App() {
@@ -83,9 +83,10 @@ export function App() {
     try {
       if ("calls" in scenario) await runPay(scenario);
       else {
-        append({ kind: "activity", text: `Requesting ${scenario.swap.tokenIn} to ${scenario.swap.tokenOut} through Ma'at Gateway.` });
+        append({ kind: "activity", text: `Sending ${scenario.title.toLowerCase()} to Ma'at Gateway.` });
         const { decision } = await request(`/api/demo/scenarios/${scenario.id}/swap`);
-        append({ kind: "decision", label: scenario.title, amountUsd: scenario.swap.amountUsd, verdict: decision.verdict, reasons: decision.reasons, text: decision.error || "Swap is not available yet." });
+        if (decision.quote?.route) append({ kind: "activity", text: `Quoted route: ${decision.quote.route}.` });
+        append({ kind: "decision", label: scenario.title, amountUsd: scenario.swap.amountUsd, verdict: decision.verdict, decidedBy: decision.decidedBy, reasons: decision.reasons, text: decision.analysisOnly ? "Analysis only. No trade was executed." : decision.error || "Swap decision received." });
       }
       append({ kind: "result", text: `${scenario.title}: request finished.` });
     } catch (caught) {

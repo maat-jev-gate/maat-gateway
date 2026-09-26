@@ -31,17 +31,17 @@ export const scenarios = [
   },
   {
     id: "swap-approval",
-    title: "Swap with approval",
-    service: "Uniswap + World ID",
-    task: "Swap $30 of ETH for USDC. Request human approval before execution; also demonstrate cancellation.",
-    swap: { tokenIn: "ETH", tokenOut: "USDC", amountUsd: 30 },
+    title: "Review ETH-to-USDC swap",
+    service: "Uniswap + Swap Guard",
+    task: "Assess a $30 ETH-to-USDC swap. Report whether owner approval is required; do not execute a trade.",
+    swap: { chainId: 1, tokenIn: "ETH", tokenOut: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", amountUsd: 30, source: "owner" },
   },
   {
     id: "swap-block",
-    title: "Block risky swap",
-    service: "Uniswap quote",
-    task: "Assess an $8 swap from USDC into the token promoted by a social post and block it if the evidence is unsafe.",
-    swap: { tokenIn: "USDC", tokenOut: "DEMO_TOKEN", amountUsd: 8 },
+    title: "Screen a social token",
+    service: "Swap Guard risk analysis",
+    task: "Assess an $8 ETH-to-PEPE swap promoted by a social post. Report the live risk verdict without executing a trade.",
+    swap: { chainId: 1, tokenIn: "ETH", tokenOut: "0x6982508145454Ce325dDbE47a25d4ec3d2311933", amountUsd: 8, source: "social" },
   },
 ] as const;
 

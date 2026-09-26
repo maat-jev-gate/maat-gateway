@@ -11,6 +11,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { isAddress, type Hex } from "viem";
 import { gatewaySettings, updateGatewaySettings, type GatewaySettings } from "./settings";
 import { checkPaymentRisk, type RiskCheck } from "./intercepta";
+import { screenSwap, SwapGuardError, type SwapIntent } from "./swap-guard";
 
 config();
 
@@ -23,15 +24,6 @@ type PayRequest = {
   authorization?: string;
   taskId: string;
   bypassJev?: boolean;
-};
-
-type SwapRequest = {
-  agentId: string;
-  taskId: string;
-  purpose: string;
-  tokenIn: string;
-  tokenOut: string;
-  amountUsd: number;
 };
 
 type DemoScenario = "allow" | "block" | "escalate";
@@ -577,21 +569,21 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
   } finally { clearTimeout(timeout); }
 });
 
-async function swap(_input: SwapRequest): Promise<never> {
-  // TODO: Request a Uniswap quote, evaluate swap evidence, and execute only after approval.
-  throw new Error("Swap service is not implemented yet.");
-}
-
-app.post<{ Body: SwapRequest }>("/api/maat/swap", async (request, reply) => {
+app.post<{ Body: SwapIntent }>("/api/maat/swap", async (request, reply) => {
   if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
   const input = request.body;
-  if (!input || typeof input.agentId !== "string" || typeof input.taskId !== "string" || typeof input.purpose !== "string" || typeof input.tokenIn !== "string" || typeof input.tokenOut !== "string" || typeof input.amountUsd !== "number" || !Number.isFinite(input.amountUsd) || input.amountUsd <= 0) {
-    return reply.code(400).send({ error: "agentId, taskId, purpose, tokenIn, tokenOut, and a positive amountUsd are required." });
+  if (!input || typeof input.agentId !== "string" || !input.agentId.trim() || typeof input.taskId !== "string" || !input.taskId.trim() ||
+      typeof input.purpose !== "string" || !input.purpose.trim() || input.chainId !== 1 ||
+      typeof input.tokenIn !== "string" || typeof input.tokenOut !== "string" || !isAddress(input.tokenOut) ||
+      typeof input.amountUsd !== "number" || !Number.isFinite(input.amountUsd) || input.amountUsd <= 0 ||
+      !["owner", "vendor", "social"].includes(input.source) ||
+      (input.instruction !== undefined && typeof input.instruction !== "string")) {
+    return reply.code(400).send({ error: "A valid agentId, taskId, purpose, mainnet chainId, tokenIn, tokenOut address, positive amountUsd, and source are required." });
   }
   try {
-    return await swap(input);
+    return reply.header("Cache-Control", "no-store").send(await screenSwap(input));
   } catch (error) {
-    return reply.code(501).send({ error: error instanceof Error ? error.message : "Swap service is not implemented yet." });
+    return reply.code(error instanceof SwapGuardError ? error.status : 502).send({ error: error instanceof Error ? error.message : "Swap Guard request failed." });
   }
 });
 

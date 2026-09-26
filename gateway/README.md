@@ -45,7 +45,9 @@ gateway/
 
 ## Agent, Gateway, and Merchant calls
 
-The Agent sends x402 requests to `POST /api/maat/pay` and swap intents to the separate `POST /api/maat/swap` endpoint. The pay endpoint contacts the Merchant and runs the current decision and settlement flow. The swap endpoint validates the intent and returns HTTP 501 until the Uniswap quote, risk checks, approval, and execution service is implemented.
+The Agent sends x402 requests to `POST /api/maat/pay` and swap intents to the separate `POST /api/maat/swap` endpoint. The pay endpoint contacts the Merchant and runs the current decision and settlement flow. The swap endpoint authenticates the Agent, then sends the mainnet intent to the standalone Swap Guard and returns its analysis decision. The Swap Guard owns the quote, risk checks, and JEV verdict. Its response has `analysisOnly: true`; Gateway does not sign or broadcast a swap or create a World ID approval for it.
+
+Swap requests include `agentId`, `taskId`, `purpose`, `chainId: 1`, `tokenIn: "ETH"`, a mainnet ERC-20 `tokenOut` address, positive `amountUsd`, and `source` (`owner`, `vendor`, or `social`). Set `SWAP_GUARD_URL` to the Guard origin. The Gateway returns its decision JSON unchanged after checking that it belongs to the requested Agent and token. A Guard validation error returns HTTP 400; an unavailable or malformed Guard response returns HTTP 502, and a timeout returns HTTP 504.
 
 The Agent implementation is in [`../agent-demo`](../agent-demo). It sends the following body to `POST /api/maat/pay` and adds an `Authorization: Basic ...` header from its local environment:
 
@@ -132,6 +134,7 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 | `WORLD_REDIRECT_URI` | Registered callback URL for this Gateway |
 | `MERCHANT_TIMEOUT_MS` | Timeout for each Merchant request |
 | `MERCHANT_URL` | Merchant resource URL used by the Gateway console defaults and demo requests |
+| `SWAP_GUARD_URL` | HTTPS origin of the standalone Swap Guard analysis API |
 
 `MAAT_TREASURY_PRIVATE_KEY` must be a testnet-only account funded with the Merchant's payment token and native gas. Keep it in the ignored `.env` file; do not add it to any `VITE_` variable.
 
