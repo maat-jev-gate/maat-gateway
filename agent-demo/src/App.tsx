@@ -8,6 +8,7 @@ const steps = [
   { label: "Dataset 03", url: "https://atlas.example/dataset/gamma", method: "GET", purpose: "Purchase the third Atlas dataset", amountUsd: 5 },
   { label: "Verification fee", url: "https://atlas.example/verify-account", method: "POST", purpose: "Additional account verification fee", amountUsd: 80 },
 ] as const;
+const defaultGatewayUrl = import.meta.env.VITE_MAAT_GATEWAY_URL?.trim() || "https://gateway.maat-jev-gate.online/api/maat/pay";
 
 function gatewayAuth() {
   const user = import.meta.env.VITE_MAAT_GATEWAY_BASIC_USER?.trim() ?? "";
@@ -17,7 +18,7 @@ function gatewayAuth() {
 }
 
 export function App() {
-  const [gatewayUrl, setGatewayUrl] = useState("https://gateway.maat-jev-gate.online/api/maat/pay");
+  const [gatewayUrl, setGatewayUrl] = useState(defaultGatewayUrl);
   const [task, setTask] = useState(exampleTask);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [running, setRunning] = useState(false);
@@ -38,7 +39,10 @@ export function App() {
     let decision: unknown;
     try { decision = raw ? JSON.parse(raw) : {}; } catch { decision = { raw }; }
     if (!response.ok) throw new Error(`Gateway returned HTTP ${response.status} for ${step.label}.`);
-    if (response.status === 202 && typeof decision === "object" && decision !== null && typeof (decision as { id?: unknown }).id === "string") {
+    if (response.status === 202) {
+      if (typeof decision !== "object" || decision === null || typeof (decision as { id?: unknown }).id !== "string" || !(decision as { id: string }).id) {
+        throw new Error(`Gateway returned HTTP 202 without a decision ID for ${step.label}.`);
+      }
       const decisionId = (decision as { id: string }).id;
       const decisionEndpoint = `${url.replace(/\/api\/maat\/pay\/?$/, "")}/api/maat/decisions/${decisionId}`;
       for (let attempt = 0; attempt < 60; attempt += 1) {
