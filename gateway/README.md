@@ -91,7 +91,7 @@ Gateway decisions and approvals are saved to the local, Git-ignored `data/histor
 
 ## World ID approval
 
-World ID uses the same OIDC + PKCE pattern as [`../world-demo`](../world-demo):
+World ID uses an OIDC authorization code flow with PKCE:
 
 1. The UI opens `/api/maat/approvals/:id/world/start`.
 2. The Gateway creates `state`, `nonce`, and a PKCE verifier bound to the approval ID and intent hash.
