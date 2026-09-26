@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "start": "tsx server.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/*.test.ts",
     "deploy": "node deploy.mjs"
   },
   "dependencies": {

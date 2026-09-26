@@ -12,11 +12,15 @@ const network = "eip155:84532";
 const asset = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 const facilitatorUrl = (process.env.FACILITATOR_URL ?? "https://x402.org/facilitator").replace(/\/$/, "");
 const payTo = process.env.MERCHANT_PAY_TO?.trim() ?? "";
+const verifyPayTo = process.env.MERCHANT_VERIFY_PAY_TO?.trim() || payTo;
+const riskPayTo = process.env.MERCHANT_RISK_PAY_TO?.trim() ?? "";
 const allowUnsignedPayment = process.env.DEMO_ALLOW_UNSIGNED_PAYMENT === "true";
 const historyPassword = process.env.MERCHANT_HISTORY_PASSWORD?.trim() ?? "";
 
 type Product = {
   id: string;
+  merchantName: string;
+  recipient: string;
   priceUsd: string;
   amount: string;
   description: string;
@@ -36,6 +40,8 @@ type PaymentRequirements = {
 const products: Record<string, Product> = {
   dataset: {
     id: "dataset",
+    merchantName: "Dataset seller",
+    recipient: payTo,
     priceUsd: "0.001",
     amount: "1000",
     description: "Atlas dataset access",
@@ -43,9 +49,20 @@ const products: Record<string, Product> = {
   },
   verifyAccount: {
     id: "verify-account",
+    merchantName: "Verification service",
+    recipient: verifyPayTo,
     priceUsd: "80.00",
     amount: "80000000",
     description: "Account verification fee",
+    contentType: "application/json"
+  },
+  riskCheck: {
+    id: "risk-check",
+    merchantName: "Risk recipient",
+    recipient: riskPayTo,
+    priceUsd: "0.001",
+    amount: "1000",
+    description: "Risk-screened dataset access",
     contentType: "application/json"
   }
 };
@@ -93,13 +110,13 @@ function encodeBase64Json(value: unknown): string {
 }
 
 function requirements(product: Product): PaymentRequirements {
-  if (!payTo) throw new Error("MERCHANT_PAY_TO is not configured");
+  if (!/^0x[\da-f]{40}$/i.test(product.recipient)) throw new Error("Merchant payment recipient is not configured with a valid address.");
   return {
     scheme: "exact",
     network,
     asset,
     amount: product.amount,
-    payTo,
+    payTo: product.recipient,
     maxTimeoutSeconds: 300,
     extra: { name: "USDC", version: "2" }
   };
@@ -187,7 +204,12 @@ async function paidResponse(request: FastifyRequest, reply: FastifyReply, produc
 app.register(fastifyStatic, { root: join(fileURLToPath(new URL(".", import.meta.url)), "public") });
 
 app.get("/health", async () => ({ ok: true, service: "maat-x402-vendor", network, configured: Boolean(payTo) }));
-app.get("/api/merchant/events", async () => ({ events, payTo, network, asset }));
+app.get("/api/merchant/events", async () => ({
+  events,
+  merchants: Object.values(products).map(({ id, merchantName, recipient, priceUsd }) => ({ id, name: merchantName, payTo: recipient, priceUsd })),
+  network,
+  asset
+}));
 app.delete("/api/merchant/history", async (request, reply) => {
   if (!historyPassword) return reply.code(503).send({ error: "Merchant history credentials are not configured." });
   const authorization = request.headers.authorization;
@@ -212,6 +234,11 @@ app.get<{ Params: { id: string } }>("/vendor/atlas/dataset/:id", async (request,
 app.post("/vendor/atlas/verify-account", async (request, reply) => {
   const product = products.verifyAccount;
   return paidResponse(request, reply, product, { status: "verified", account: "atlas-demo-account" });
+});
+
+app.get("/vendor/atlas/risk-check", async (request, reply) => {
+  if (!riskPayTo) return reply.code(503).send({ error: "MERCHANT_RISK_PAY_TO is not configured." });
+  return paidResponse(request, reply, products.riskCheck, { id: "risk-check", title: "Atlas dataset", rows: [] });
 });
 
 app.setErrorHandler((error, _request, reply) => {

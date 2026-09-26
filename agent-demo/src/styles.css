@@ -4,7 +4,7 @@
 *{box-sizing:border-box}
 body{margin:0;min-width:320px}
 button{font:inherit;cursor:pointer}
-.shell{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.shell{min-height:100dvh;display:flex;flex-direction:column}
 .topbar{flex:none;min-height:56px;border-bottom:1px solid #d8cdb8;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 16px;background:#eae1cf}
 .brand{display:flex;align-items:center;gap:10px}
 .mark{width:29px;height:29px;border:1px solid #b6975f;color:#4b3b22;background:#f8f2e4;display:grid;place-items:center;border-radius:50%;font:700 15px/1 Manrope,system-ui,sans-serif}
@@ -15,12 +15,12 @@ button{font:inherit;cursor:pointer}
 .status i{width:6px;height:6px;border-radius:50%;background:var(--green)}
 .status.running i{animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.3}}
-.workspace{width:min(1120px,calc(100% - 24px));margin:0 auto;flex:1;min-height:0;display:flex;flex-direction:column;padding:10px 0}
+.workspace{width:min(1120px,calc(100% - 24px));margin:0 auto;flex:1;display:flex;flex-direction:column;padding:20px 0 36px}
 .intro{flex:none;margin-bottom:9px}
 .eyebrow{color:var(--gold);margin:0 0 3px}
 h1{font:600 24px/1.2 Manrope,system-ui,sans-serif;margin:0}
 h1 em{color:var(--gold);font-style:normal}
-.agent-card{flex:1;min-height:0;background:#faf8f1;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 26px rgba(72,59,34,.06)}
+.agent-card{background:#faf8f1;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 26px rgba(72,59,34,.06)}
 .agent-head{flex:none;min-height:50px;display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line)}
 .orb{height:30px;width:30px;display:grid;place-items:center;background:#eee0be;color:#75501b;border-radius:50%}
 .agent-head b,.agent-head span{display:block}
@@ -37,7 +37,7 @@ h1 em{color:var(--gold);font-style:normal}
 .gateway-target small{display:block;margin-top:3px;overflow-wrap:anywhere}
 .gateway-target code{font:inherit}
 .demo-note{flex:none;margin:0;padding:0 14px 10px;color:var(--muted);font-size:12px;line-height:1.4;border-bottom:1px solid var(--line)}
-.chat{flex:1;min-height:0;overflow:auto;padding:14px;background:#f6f3ec;display:flex;flex-direction:column;gap:10px}
+.chat{min-height:220px;padding:14px;background:#f6f3ec;display:flex;flex-direction:column;gap:10px}
 .bubble,.welcome{max-width:82%;padding:11px 13px;border:1px solid var(--line);border-radius:6px;background:#fff;line-height:1.5}
 .bubble.task{align-self:flex-end;background:#f3e8ce;border-color:#e2c994;color:#5d4829}
 .bubble.activity{background:#edf3ee;color:#31564d}
@@ -63,6 +63,8 @@ h1 em{color:var(--gold);font-style:normal}
 .scenario-heading b{font:700 13px Manrope,system-ui,sans-serif}
 .scenario-heading button{padding:2px 0;border:0;background:none;color:var(--muted);font-size:11px}
 .scenario-heading button:disabled{opacity:.5;cursor:default}
+.scenario-recipient{display:flex;gap:8px;padding:5px 14px 0;color:var(--muted);font:10px 'DM Mono'}
+.scenario-recipient span{flex:none}.scenario-recipient code{overflow-wrap:anywhere;color:var(--red)}
 .scenario-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:9px 14px 12px}
 .scenario-button{min-width:0;height:60px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;padding:9px 12px;border:1px solid var(--line);border-radius:5px;background:#fffdf8;color:#28352f}
 .scenario-button:hover:not(:disabled),.scenario-button:focus-visible{border-color:#b58d4c;background:#f8f0dd;outline:none}
@@ -75,15 +77,16 @@ footer{flex:none;display:flex;justify-content:space-between;gap:10px;padding:0 1
 @media(max-width:680px){
   .topbar{padding:0 12px}
   .brand b{font-size:12px}
-  .workspace{width:calc(100% - 16px);padding:8px 0}
+  .workspace{width:calc(100% - 16px);padding:12px 0 24px}
   .intro{margin-bottom:7px}
   h1{font-size:20px}
   .gateway-connection{align-items:flex-start;flex-direction:column;gap:6px;padding:9px 11px 5px}
   .gateway-target{text-align:left;width:100%}
   .demo-note{padding:0 11px 8px;font-size:11px}
-  .chat{padding:10px}
+  .chat{min-height:180px;padding:10px}
   .bubble{max-width:95%}
   .scenario-heading{padding:8px 10px 0}
+  .scenario-recipient{padding:5px 10px 0}
   .scenario-list{gap:6px;padding:8px 10px 10px}
   .scenario-button{height:74px;gap:5px;padding:8px}
   .scenario-button b{font-size:11px}

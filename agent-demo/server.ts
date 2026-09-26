@@ -21,6 +21,12 @@ if ((gatewayUrl.protocol !== "https:" && !(gatewayUrl.protocol === "http:" && ["
 const gatewayPaths = { pay: "/api/maat/pay", swap: "/api/maat/swap" } as const;
 const merchantUrl = new URL(required("MERCHANT_BASE_URL"));
 if (merchantUrl.protocol !== "https:") throw new Error("MERCHANT_BASE_URL must be an HTTPS origin.");
+const payTo = process.env.AGENT_PAY_TO?.trim() ?? "";
+const verifyPayTo = process.env.AGENT_VERIFY_PAY_TO?.trim() || payTo;
+const riskPayTo = process.env.AGENT_RISK_PAY_TO?.trim() ?? "";
+for (const [name, address] of [["AGENT_PAY_TO", payTo], ["AGENT_VERIFY_PAY_TO", verifyPayTo], ["AGENT_RISK_PAY_TO", riskPayTo]]) {
+  if (address && !/^0x[\da-f]{40}$/i.test(address)) throw new Error(`${name} must be an EVM address.`);
+}
 const gatewayAuth = `Basic ${Buffer.from(`${gatewayUser}:${gatewayPassword}`).toString("base64")}`;
 const app = Fastify({ logger: true, bodyLimit: 4_000 });
 
@@ -42,7 +48,7 @@ async function forward(response: Response, reply: FastifyReply) {
 }
 
 app.get("/health", async () => ({ ok: true, service: "maat-agent-demo" }));
-app.get("/api/demo/gateway", async () => ({ url: gatewayUrl.origin, endpoints: gatewayPaths }));
+app.get("/api/demo/gateway", async () => ({ url: gatewayUrl.origin, endpoints: gatewayPaths, riskReady: Boolean(riskPayTo), riskPayTo: riskPayTo || null }));
 app.get("/api/demo/world/config", async (_request, reply) => forward(await gatewayRequest("/api/world/config"), reply));
 app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay/:index", async (request, reply) => {
   const scenario = scenarios.find((item) => item.id === request.params.id);
@@ -51,6 +57,8 @@ app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay
     return reply.code(400).send({ error: "Invalid payment scenario or call." });
   }
   const call = scenario.calls[index];
+  const recipient = scenario.id === "payment-risk" ? riskPayTo : scenario.id === "payment-block" ? verifyPayTo : payTo;
+  if (scenario.id === "payment-risk" && !recipient) return reply.code(409).send({ error: "AGENT_RISK_PAY_TO is not configured." });
   if (scenario.id === "payment-escalate") {
     const settingsResponse = await gatewayRequest("/api/maat/settings");
     if (!settingsResponse.ok) return forward(settingsResponse, reply);
@@ -62,7 +70,7 @@ app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay
   const response = await gatewayRequest(gatewayPaths.pay, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.task, purpose: call.purpose, taskId: `demo-${scenario.id}` }),
+    body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.task, purpose: call.purpose, payTo: recipient || undefined, taskId: `demo-${scenario.id}` }),
   });
   return forward(response, reply);
 });

@@ -16,6 +16,13 @@ export const scenarios = [
     calls: [{ label: "Verification fee", path: "/vendor/atlas/verify-account", method: "POST", purpose: "Additional account verification fee", amountUsd: 80 }],
   },
   {
+    id: "payment-risk",
+    title: "Block risky recipient",
+    service: "x402 + Intercepta",
+    task: "Purchase one Atlas dataset for $0.001 only if the recipient passes risk screening.",
+    calls: [{ label: "Risk-screened dataset", path: "/vendor/atlas/risk-check", method: "GET", purpose: "Purchase one Atlas dataset for 0.001 USDC", amountUsd: 0.001 }],
+  },
+  {
     id: "payment-escalate",
     title: "Approve dataset purchase",
     service: "x402 pay + World ID",

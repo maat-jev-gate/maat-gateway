@@ -8,8 +8,9 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { privateKeyToAccount } from "viem/accounts";
-import type { Hex } from "viem";
+import { isAddress, type Hex } from "viem";
 import { gatewaySettings, updateGatewaySettings, type GatewaySettings } from "./settings";
+import { checkPaymentRisk, type RiskCheck } from "./intercepta";
 
 config();
 
@@ -18,6 +19,7 @@ type PayRequest = {
   url: string;
   method: string;
   purpose: string;
+  payTo?: string;
   authorization?: string;
   taskId: string;
   bypassJev?: boolean;
@@ -41,14 +43,15 @@ type Decision = {
   taskId: string;
   kind: "pay";
   verdict: "ALLOW" | "BLOCK" | "ESCALATE";
-  decidedBy: "jev" | "gateway" | "fallback" | "error";
+  decidedBy: "jev" | "gateway" | "fallback" | "error" | "intercepta";
   confidence?: number;
   probability?: number;
   reasons: string[];
   intent: PayRequest;
   merchant: { status?: number; requirements?: unknown; response?: unknown; payer?: string };
   payer?: string;
-  timings: { totalMs: number; merchantMs?: number; jevMs?: number };
+  timings: { totalMs: number; merchantMs?: number; jevMs?: number; interceptaMs?: number };
+  intercepta?: RiskCheck;
   error?: string;
   approvalId?: string;
   intentHash?: string;
@@ -145,6 +148,21 @@ async function settleDecisionPayment(decision: Decision, input: PayRequest, quot
       decision.paymentStatus = "completed";
       decision.reasons.push("Real payment is bypassed in Gateway settings; this is a dry run.");
       return;
+    }
+    const requirements = paymentRequirements(quote);
+    const original = paymentRequirements(decision.merchant as MerchantResult);
+    if (["scheme", "network", "asset", "amount", "payTo", "maxTimeoutSeconds"]
+      .some((field) => requirements[field as keyof PaymentRequirements] !== original[field as keyof PaymentRequirements])
+      || requirements.extra.name !== original.extra.name || requirements.extra.version !== original.extra.version) {
+      throw new Error("Merchant payment requirements changed after the decision.");
+    }
+    const risk = await checkPaymentRisk(requirements, controller.signal);
+    decision.intercepta = risk;
+    decision.timings.interceptaMs = (decision.timings.interceptaMs ?? 0) + risk.ms;
+    if (risk.status !== "clear") {
+      decision.verdict = "BLOCK";
+      decision.decidedBy = "intercepta";
+      throw new Error(`Intercepta ${risk.status}: ${risk.reasons.join("; ")}`);
     }
     const settled = await settleMerchantRequest(input, quote, controller.signal);
     decision.merchant = settled;
@@ -482,7 +500,7 @@ app.get<{ Querystring: { code?: string; state?: string; error?: string; error_de
 app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
   if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
   const input = request.body;
-  if (!input || typeof input.agentId !== "string" || typeof input.url !== "string" || typeof input.method !== "string" || typeof input.purpose !== "string" || typeof input.taskId !== "string") {
+  if (!input || typeof input.agentId !== "string" || typeof input.url !== "string" || typeof input.method !== "string" || typeof input.purpose !== "string" || typeof input.taskId !== "string" || (input.payTo !== undefined && !isAddress(input.payTo))) {
     return reply.code(400).send({ error: "agentId, url, method, purpose, and taskId are required." });
   }
   const totalStartedAt = performance.now();
@@ -493,6 +511,9 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
     const merchantStartedAt = performance.now();
     if (!gatewaySettings.bypassMerchantRequest) merchant = await merchantRequest(input, controller.signal);
     const merchantMs = gatewaySettings.bypassMerchantRequest ? undefined : Math.round(performance.now() - merchantStartedAt);
+    const requirements = gatewaySettings.bypassMerchantRequest ? undefined : paymentRequirements(merchant as MerchantResult);
+    const recipientMismatch = Boolean(input.payTo && requirements && input.payTo.toLowerCase() !== requirements.payTo.toLowerCase());
+    const risk = requirements ? await checkPaymentRisk(requirements, controller.signal) : undefined;
     let verdict: Verdict;
     let decidedBy: Decision["decidedBy"] = "jev";
     let probability: number | undefined;
@@ -500,8 +521,16 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
     let jevMs: number | undefined;
     const reasons: string[] = [];
     if (gatewaySettings.bypassMerchantRequest) reasons.push("Merchant request is bypassed by Gateway setting.");
+    if (recipientMismatch) reasons.push("Merchant payTo does not match the Agent's intended recipient.");
+    if (risk) reasons.push(risk.status === "clear" ? "Intercepta recipient check clear." : `Intercepta ${risk.status}: ${risk.reasons.join("; ")}`);
     const bypassJev = input.bypassJev ?? gatewaySettings.bypassJev;
-    if (bypassJev) {
+    if (recipientMismatch) {
+      verdict = "BLOCK";
+      decidedBy = "gateway";
+    } else if (risk && risk.status !== "clear") {
+      verdict = "BLOCK";
+      decidedBy = "intercepta";
+    } else if (bypassJev) {
       verdict = gatewaySettings.jevBypassVerdict;
       decidedBy = "fallback";
       reasons.push(`JEV bypass is enabled; using configured ${verdict} verdict.`);
@@ -522,7 +551,7 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
     }
     const paymentExecuted = false;
     const decisionId = crypto.randomUUID();
-    const decision: Decision = { id: decisionId, createdAt: new Date().toISOString(), ...input, kind: "pay", verdict, decidedBy, confidence, probability, reasons, intent: input, merchant, payer: merchant.payer, paymentExecuted, paymentStatus: verdict === "BLOCK" ? "completed" : "pending", timings: { totalMs: Math.round(performance.now() - totalStartedAt), merchantMs, jevMs } };
+    const decision: Decision = { id: decisionId, createdAt: new Date().toISOString(), ...input, kind: "pay", verdict, decidedBy, confidence, probability, reasons, intent: input, merchant, payer: merchant.payer, intercepta: risk, paymentExecuted, paymentStatus: verdict === "BLOCK" ? "completed" : "pending", timings: { totalMs: Math.round(performance.now() - totalStartedAt), merchantMs, jevMs, interceptaMs: risk?.ms } };
     if (verdict === "ESCALATE") {
       const approvalId = crypto.randomUUID();
       const hash = intentHash(input);

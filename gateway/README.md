@@ -10,6 +10,7 @@ agent-demo
     ▼
 gateway/server.ts
     ├── fetch Merchant URL (quote / HTTP 402)
+    ├── screen payTo and supported payment token with Intercepta
     ├── call TypeSafe System One / JEV
     ├── ALLOW      → return decision
     ├── BLOCK      → return decision without releasing a Merchant result
@@ -28,6 +29,7 @@ gateway/
 ├── server.ts          Thin process entry point
 ├── server/
 │   ├── app.ts         Fastify API assembly and backend request flow
+│   ├── intercepta.ts  Server-side x402 recipient and token risk checks
 │   └── settings.ts    Server-owned runtime settings and defaults
 ├── src/
 │   ├── App.tsx        Single-column decision stream and development request form
@@ -61,7 +63,15 @@ The Gateway enables CORS for the Agent's browser request, including the `Authori
 
 The Gateway uses `url` and `method` to contact the Merchant in `merchantRequest`. The Merchant is the [`../x402-demo/merchant`](../x402-demo/merchant) service. It returns HTTP 402 and payment requirements before a payment is supplied. The Gateway includes those requirements in the JEV state, but does not expose the JEV API key to the Agent or browser.
 
-`BLOCK` decisions return immediately. `ALLOW` and `ESCALATE` decisions return HTTP `202` with a decision `id` and `paymentStatus: "pending"`; the Agent must poll `GET /api/maat/decisions/:id` until `paymentStatus` becomes `completed` or `failed`. Payment signing and settlement happen asynchronously after the initial response.
+`BLOCK` decisions return immediately. `ALLOW` and `ESCALATE` decisions return HTTP `202` with a decision `id` and `paymentStatus: "pending"`; the Agent must poll `GET /api/maat/decisions/:id` until `paymentStatus` becomes `completed` or `failed`. Payment signing and settlement happen asynchronously after the initial response. Intercepta is checked again immediately before signing, including after World ID approval. A changed Merchant quote or failed risk check stops settlement.
+
+## Intercepta payment screening
+
+The live call is in [`server/intercepta.ts`](server/intercepta.ts); [`server/app.ts`](server/app.ts) invokes it after reading the Merchant's x402 requirements and before creating a payment signature. Quick Scan checks `payTo`, which is the same EVM address on mainnet and Base Sepolia. Token Scan checks Ethereum and Base mainnet assets. For the demo's Base Sepolia USDC, it checks the official Base mainnet USDC contract (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`) as a risk-data proxy. Other testnet tokens receive address screening only. The proxy scan does not establish that a testnet token contract is authentic.
+
+A recipient toxic score of at least 80, a known scammer/sanctions/blacklist/rug-pull trait, or a token `block` / `high` result blocks payment. An API error, missing key, or malformed response also blocks payment before signing. Results, reasons, and raw scan responses appear on the Gateway decision card. Responses are cached for ten minutes by default; set `INTERCEPTA_CACHE=off` to force live calls during a recording.
+
+For a blocked demo, use a mainnet address from the pinned Intercepta channel in the ETHGlobal Discord as the Merchant's `MERCHANT_PAY_TO` in a test Merchant instance. Check it with the live API before recording. The Intercepta API is a lookup for an address supplied by the caller; the prize page points to Discord for known-risk test addresses rather than a list endpoint. Do not send a test payment to that recipient.
 
 ## JEV decision flow
 
@@ -114,6 +124,8 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 | --- | --- |
 | `GATEWAY_BASIC_USER` / `GATEWAY_BASIC_PASSWORD` | Server-side credentials required by Agent requests and authenticated Gateway console actions |
 | `MAAT_TREASURY_PRIVATE_KEY` | Server-only 32-byte hex private key used to sign x402 payments |
+| `INTERCEPTA_API_KEY` | Server-only Intercepta key; required for real x402 payments |
+| `INTERCEPTA_API_URL` / `INTERCEPTA_CACHE` | Optional API base URL and ten-minute response cache control |
 | `JEV_API_URL` / `JEV_API_KEY` / `JEV_MODEL` | Direct TypeSafe JEV connection used by the Gateway |
 | `WORLD_ISSUER` | World Sandbox issuer, normally `https://sandbox.auth.world.org` |
 | `WORLD_CLIENT_ID` / `WORLD_CLIENT_SECRET` | Confidential World OIDC client credentials |
@@ -124,6 +136,8 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 `MAAT_TREASURY_PRIVATE_KEY` must be a testnet-only account funded with the Merchant's payment token and native gas. Keep it in the ignored `.env` file; do not add it to any `VITE_` variable.
 
 The Agent supplies `purpose` on every payment request. The Gateway console keeps Demo purpose in the Demo Requests row, while server Settings contain only the Merchant URL and runtime controls. Agent purposes can differ by task and step; the Agent demo combines the user task with each step purpose before calling the Gateway.
+
+Agents may also send `payTo` as their intended recipient. The Gateway blocks the request when it differs from the Merchant's `payTo` in the x402 quote. The risk-recipient Agent scene supplies this field from its server-only environment; the Merchant quotes the same address from its own environment.
 
 The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. `Apply settings` sends the complete configuration to `POST /api/maat/settings` without a password; the server returns the authoritative configuration and the UI replaces its local copy with that response. Other authenticated console actions prompt the operator for Gateway credentials and keep them only in page memory. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
 
