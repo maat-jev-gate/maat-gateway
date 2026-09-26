@@ -155,6 +155,24 @@ Swap Guard uses the Uniswap Trading API when configured and otherwise quotes v2/
 
 [Integration feedback](FEEDBACK.md#uniswap)
 
+## Screenshots
+
+### Intercepta payment screening
+
+![Agent, Gateway, and Merchant views showing an allowed payment and an Intercepta-blocked recipient](docs/demo-1-intercepta.png)
+
+### World ID confirmation
+
+![World ID authorization window opened from a pending Gateway payment approval](docs/demo-2-world-id-2.png)
+
+### World ID approval result
+
+![Agent, Gateway, and Merchant views showing a World ID-approved payment and settlement](docs/demo-2-world-id.png)
+
+### Uniswap swap analysis
+
+![Agent, Gateway, and Swap Guard views showing Uniswap swap analysis and escalation without trade execution](docs/demo-3-uniswap.png)
+
 ## Deploy Gateway
 
 The Gateway deploys with PM2 and Caddy. Fill the deployment and production integration values in the ignored `gateway/.env`, then run:
