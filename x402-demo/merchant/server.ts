@@ -15,7 +15,6 @@ const payTo = process.env.MERCHANT_PAY_TO?.trim() ?? "";
 const verifyPayTo = process.env.MERCHANT_VERIFY_PAY_TO?.trim() || payTo;
 const riskPayTo = process.env.MERCHANT_RISK_PAY_TO?.trim() ?? "";
 const allowUnsignedPayment = process.env.DEMO_ALLOW_UNSIGNED_PAYMENT === "true";
-const historyPassword = process.env.MERCHANT_HISTORY_PASSWORD?.trim() ?? "";
 
 type Product = {
   id: string;
@@ -211,10 +210,6 @@ app.get("/api/merchant/events", async () => ({
   asset
 }));
 app.delete("/api/merchant/history", async (request, reply) => {
-  if (!historyPassword) return reply.code(503).send({ error: "Merchant history credentials are not configured." });
-  const authorization = request.headers.authorization;
-  const expected = `Basic ${Buffer.from(`operator:${historyPassword}`).toString("base64")}`;
-  if (authorization !== expected) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-merchant-history").send({ error: "Merchant history authentication failed." });
   if (request.headers["x-clear-history"] !== "confirmed") return reply.code(400).send({ error: "Clear confirmation is required." });
   if (!request.headers.origin || new URL(request.headers.origin).host !== request.headers.host) return reply.code(403).send({ error: "Same-origin request required." });
   events.length = 0;

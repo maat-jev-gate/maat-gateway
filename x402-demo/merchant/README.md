@@ -3,7 +3,6 @@
 This is the reusable merchant service for the Maat x402 demo. It advertises payment requirements with x402 and settles a payment through an x402 facilitator before returning the protected response. The root x402 Merchant page shows all three mock Merchant profiles and identifies the profile behind each request.
 
 Request and settlement records are saved in the local, Git-ignored `data/history.json` file in development and production. The console's **Clear History** button opens a confirmation dialog and clears only Merchant records.
-Set `MERCHANT_HISTORY_PASSWORD` in the ignored `.env` file to enable this authenticated action. The console prompts the operator for that password when clearing records.
 
 ## Run
 

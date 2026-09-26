@@ -87,19 +87,12 @@
         }
       }
       const dialog = document.querySelector("#clear-dialog");
-      let historyAuthorization = "";
       document.querySelector("#clear-history").addEventListener("click", () => dialog.showModal());
       document.querySelector("#cancel-clear").addEventListener("click", () => dialog.close());
       document.querySelector("#confirm-clear").addEventListener("click", async () => {
         const button = document.querySelector("#confirm-clear"); button.disabled = true;
         try {
-          if (!historyAuthorization) {
-            const password = window.prompt("Merchant history password");
-            if (password === null) return;
-            historyAuthorization = "Basic " + btoa("operator:" + password);
-          }
-          const response = await fetch("/api/merchant/history", { method: "DELETE", headers: { authorization: historyAuthorization, "x-clear-history": "confirmed" } });
-          if (response.status === 401) historyAuthorization = "";
+          const response = await fetch("/api/merchant/history", { method: "DELETE", headers: { "x-clear-history": "confirmed" } });
           if (!response.ok) throw new Error("Merchant history could not be cleared.");
           dialog.close(); await refresh();
         } catch (error) { window.alert(error.message); }
