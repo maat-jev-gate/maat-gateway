@@ -131,7 +131,7 @@ A high-risk deployer triggers H2. A high-risk funder is a strong signal for JEV 
 
 ## Pre-hackathon work
 
-The visual direction (brass palette, the balance, the verdict stamp, the timing waterfall) follows the concept page in `../swap-guard-demo/`. This app was written from scratch after the start: no code, data, or address lists were copied from that page, and it contains no mock data.
+The visual direction (brass palette, the balance, the verdict stamp, the timing waterfall) follows a static concept page with mock data that was made before the start. It was briefly kept in this repository as `swap-guard-demo/` and has since been removed. This app was written from scratch after the start: no code, data, or address lists were copied from that page, and it contains no mock data.
 
 ## AI usage
 
