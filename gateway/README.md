@@ -43,6 +43,8 @@ gateway/
 
 ## Agent, Gateway, and Merchant calls
 
+The Agent sends x402 requests to `POST /api/maat/pay` and swap intents to the separate `POST /api/maat/swap` endpoint. The pay endpoint contacts the Merchant and runs the current decision and settlement flow. The swap endpoint validates the intent and returns HTTP 501 until the Uniswap quote, risk checks, approval, and execution service is implemented.
+
 The Agent implementation is in [`../agent-demo`](../agent-demo). It sends the following body to `POST /api/maat/pay` and adds an `Authorization: Basic ...` header from its local environment:
 
 The Gateway enables CORS for the Agent's browser request, including the `Authorization` header used by the local demo.

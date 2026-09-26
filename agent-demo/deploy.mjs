@@ -40,7 +40,7 @@ async function main() {
   if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error("DEPLOY_DOMAIN must be a hostname.");
   if (!/^\/[a-zA-Z0-9/_-]+$/.test(appDir)) throw new Error("REMOTE_APP_DIR must be an absolute path without shell characters.");
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("PORT must be a valid user-space port.");
-  for (const name of ["GATEWAY_BASIC_USER", "GATEWAY_BASIC_PASSWORD"]) {
+  for (const name of ["GATEWAY_BASIC_USER", "GATEWAY_BASIC_PASSWORD", "MERCHANT_BASE_URL"]) {
     if (!env[name]) throw new Error(`Missing ${name} in .env.`);
   }
   const caddyConfig = await readFile(caddyFile, "utf8");
@@ -65,7 +65,7 @@ if [ -f /etc/caddy/sites/$DOMAIN.caddy ]; then cp /etc/caddy/sites/$DOMAIN.caddy
 `);
   await command("rsync", ["-az", "--delete", `${join(root, "dist")}/`, `${host}:${appDir}/dist/`]);
   await command("rsync", ["-az", "server.ts", "package.json", "package-lock.json", "ecosystem.config.cjs", `${host}:${appDir}/`]);
-  await command("rsync", ["-az", "src/steps.ts", `${host}:${appDir}/src/`]);
+  await command("rsync", ["-az", "src/scenarios.ts", `${host}:${appDir}/src/`]);
   await command("rsync", ["-az", ".env", `${host}:${appDir}/.env`]);
   await command("rsync", ["-az", caddyFile, `${host}:/etc/caddy/sites/${domain}.caddy`]);
   await ssh(`

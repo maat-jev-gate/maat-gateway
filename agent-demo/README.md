@@ -1,12 +1,15 @@
 # Maat Agent Demo
 
-This demo runs a fixed four-step payment story in a full-screen agent view. The Agent service sends each payment intent to the configured Maat Gateway:
+The Agent interface presents four independent scenes from the demo script:
 
-```json
-{ "agentId": "maat-demo-agent", "url": "...", "method": "GET", "purpose": "...", "taskId": "demo-fixed-payment-run" }
-```
+| Scene | Gateway endpoint | Current behavior |
+| --- | --- | --- |
+| Pay for datasets | `POST /api/maat/pay` | Sends three x402 purchases to the live Merchant, one after another. |
+| Block verification fee | `POST /api/maat/pay` | Sends the Merchant's $80 verification request for a Gateway decision. |
+| Swap with approval | `POST /api/maat/swap` | Reaches the swap endpoint, which currently returns HTTP 501. |
+| Block risky swap | `POST /api/maat/swap` | Reaches the swap endpoint, which currently returns HTTP 501. |
 
-The browser calls only the Agent service's same-origin `/api/demo/*` routes. The service keeps `GATEWAY_BASIC_USER` and `GATEWAY_BASIC_PASSWORD` in its server-side `.env`, calls `GATEWAY_URL`, and forwards Gateway decisions. The four Merchant endpoints are fixed in `src/steps.ts`; browser requests cannot choose a payment URL. The demo does not call OpenAI and does not contain a wallet key.
+The browser calls only the Agent service's same-origin `/api/demo/scenarios/*` routes. The Agent service keeps Gateway credentials in its ignored `.env`, sends the fixed scene intents to the Gateway, and forwards decisions. The Merchant origin comes from `MERCHANT_BASE_URL`; the allowed resource paths are defined in `src/scenarios.ts`. Browser requests cannot choose a Merchant URL or payment amount. The Agent UI is open to visitors; Gateway credentials remain server-side.
 
 ## Run
 
@@ -16,7 +19,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:5175` for local development. Vite proxies `/api` to the Agent service on port `8794`. The published Agent UI is `https://agent.maat-jev-gate.online` and does not require a visitor login.
+Set the Gateway credentials in `.env`. The intended public demo domains are provided in `.env.example`; local development uses the same online Merchant and Gateway. The interface runs at `http://localhost:5175`, and Vite proxies API requests to the Agent service on port `8794`. The published Agent UI is `https://agent.maat-jev-gate.online` and does not require a visitor login.
 
 ## Publish
 
@@ -27,4 +30,4 @@ npm run deploy:validate
 npm run deploy
 ```
 
-The deploy script builds the Vite output, syncs the Agent service and its server-only `.env`, installs production dependencies, starts it with PM2, then updates Caddy to proxy the public domain to port `8794`. `npm start` serves the built site and API directly without Caddy when another HTTPS ingress is used.
+The deploy script builds the site, syncs the Agent service and its server-only `.env`, installs production dependencies, starts it with PM2, and updates Caddy. `npm start` serves the built site and API directly when another HTTPS ingress is used.

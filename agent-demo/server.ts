@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import Fastify, { type FastifyReply } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { fileURLToPath } from "node:url";
-import { steps } from "./src/steps";
+import { scenarios } from "./src/scenarios";
 
 config();
 
@@ -16,8 +16,10 @@ const port = Number(process.env.PORT ?? 8794);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be a valid port.");
 const gatewayUser = required("GATEWAY_BASIC_USER");
 const gatewayPassword = required("GATEWAY_BASIC_PASSWORD");
-const gatewayUrl = new URL(process.env.GATEWAY_URL?.trim() || "https://gateway.maat-jev-gate.online/api/maat/pay");
-if (gatewayUrl.protocol !== "https:" || gatewayUrl.pathname !== "/api/maat/pay") throw new Error("GATEWAY_URL must be an HTTPS Gateway pay endpoint.");
+const gatewayUrl = new URL(required("GATEWAY_URL"));
+if ((gatewayUrl.protocol !== "https:" && !(gatewayUrl.protocol === "http:" && ["127.0.0.1", "localhost"].includes(gatewayUrl.hostname))) || gatewayUrl.pathname !== "/api/maat/pay") throw new Error("GATEWAY_URL must be an HTTPS Gateway pay endpoint or a local HTTP endpoint.");
+const merchantUrl = new URL(required("MERCHANT_BASE_URL"));
+if (merchantUrl.protocol !== "https:") throw new Error("MERCHANT_BASE_URL must be an HTTPS origin.");
 const gatewayAuth = `Basic ${Buffer.from(`${gatewayUser}:${gatewayPassword}`).toString("base64")}`;
 const app = Fastify({ logger: true, bodyLimit: 4_000 });
 
@@ -39,17 +41,27 @@ async function forward(response: Response, reply: FastifyReply) {
 }
 
 app.get("/health", async () => ({ ok: true, service: "maat-agent-demo" }));
-app.post<{ Params: { index: string }; Body: { task?: unknown } }>("/api/demo/steps/:index", async (request, reply) => {
+app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay/:index", async (request, reply) => {
+  const scenario = scenarios.find((item) => item.id === request.params.id);
   const index = Number(request.params.index);
-  const task = request.body?.task;
-  if (!Number.isInteger(index) || index < 0 || index >= steps.length || typeof task !== "string" || !task.trim() || task.length > 1_000) {
-    return reply.code(400).send({ error: "A valid step and task are required." });
+  if (!scenario || !("calls" in scenario) || !Number.isInteger(index) || index < 0 || index >= scenario.calls.length) {
+    return reply.code(400).send({ error: "Invalid payment scenario or call." });
   }
-  const step = steps[index];
+  const call = scenario.calls[index];
   const response = await gatewayRequest("/api/maat/pay", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ agentId: "maat-demo-agent", url: step.url, method: step.method, purpose: `${task.trim()} - ${step.purpose}`, taskId: "demo-fixed-payment-run" }),
+    body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.id === "payment-allow" ? `${scenario.task} This specific payment is for ${call.label} at ${call.amountUsd} USDC.` : scenario.task, purpose: call.purpose, taskId: `demo-${scenario.id}` }),
+  });
+  return forward(response, reply);
+});
+app.post<{ Params: { id: string } }>("/api/demo/scenarios/:id/swap", async (request, reply) => {
+  const scenario = scenarios.find((item) => item.id === request.params.id);
+  if (!scenario || !("swap" in scenario)) return reply.code(400).send({ error: "Invalid swap scenario." });
+  const response = await gatewayRequest("/api/maat/swap", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ agentId: "maat-demo-agent", taskId: `demo-${scenario.id}`, purpose: scenario.task, ...scenario.swap }),
   });
   return forward(response, reply);
 });
