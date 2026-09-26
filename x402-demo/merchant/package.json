@@ -1,0 +1,22 @@
+{
+  "name": "maat-x402-vendor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/static": "latest",
+    "dotenv": "latest",
+    "fastify": "latest",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}
