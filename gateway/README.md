@@ -157,3 +157,14 @@ The three buttons under **DEMO REQUESTS** call `POST /api/maat/demo`. This route
 npm run typecheck
 npm run build
 ```
+
+## Deploy
+
+Set `DEPLOY_HOST`, `DEPLOY_DOMAIN`, and the production integration values in the ignored `.env`. Ensure `deploy/caddy/site.caddy` uses the configured domain and `PORT`. From `gateway/`, run:
+
+```bash
+npm install
+npm run deploy
+```
+
+The script type-checks and builds locally, syncs the app and `.env` to the deployment host, reloads the PM2 process and Caddy, and verifies `/health` on the host.

@@ -6,7 +6,17 @@ Maat is the pre-signing gate for AI agents that pay and trade. The agent holds n
 
 Maat Gateway screens an Agent's x402 payments and swap intents before any payment is signed.
 
-The Agent has no treasury key. The Gateway signs approved x402 payments; swap requests are analysis-only and never produce a signed or broadcast trade.
+The Agent has no treasury key. The Gateway signs approved x402 payments and supports Uniswap swaps (analysis only in this demo project).
+
+## Contents
+
+- [Projects](#projects)
+- [Overview](#overview)
+- [x402 Payment Detail](#x402-payment-detail)
+- [Uniswap Swap Detail](#uniswap-swap-detail)
+- [Sponsor integration code](#sponsor-integration-code)
+- [Integration feedback](#integration-feedback)
+- [Screenshots](#screenshots)
 
 ## Projects
 
@@ -44,7 +54,7 @@ flowchart LR
     S --> J
 ```
 
-## Payment Detail
+## x402 Payment Detail
 
 The Gateway reads the Merchant's 402 quote, screens it with Intercepta, and evaluates the payment intent with JEV. The Agent never receives the treasury key. The Gateway observer shows decisions and lets the user confirm or cancel pending approvals.
 
@@ -108,9 +118,9 @@ sequenceDiagram
     Gateway-->>Agent: Settled payment result
 ```
 
-## Swap Detail
+## Uniswap Swap Detail
 
-The Gateway forwards swap intents to Swap Guard for a Uniswap quote and risk analysis. No trade is signed or broadcast.
+The Gateway forwards Uniswap swap intents to Swap Guard for a quote and risk analysis. This demo returns the analysis without executing the trade.
 
 Swap Guard uses the Uniswap Trading API when configured and otherwise quotes v2/v3 contracts through mainnet RPC. It checks token and deployer risk, traces funding with explorer data, applies hard rules, and asks JEV when the rules leave a decision open.
 
@@ -212,15 +222,3 @@ sequenceDiagram
 ### Uniswap swap analysis
 
 ![Agent, Gateway, and Swap Guard views showing Uniswap swap analysis and escalation without trade execution](docs/demo-3-uniswap.png)
-
-## Deploy Gateway
-
-The Gateway deploys with PM2 and Caddy. Fill the deployment and production integration values in the ignored `gateway/.env`, then run:
-
-```bash
-cd gateway
-npm install
-npm run deploy
-```
-
-The script builds and type-checks the Gateway locally, syncs the build, server files, `.env`, and `deploy/caddy/site.caddy` to `/opt/maat-gateway` and the Caddy site directory, installs production dependencies, reloads the `maat-gateway` PM2 process, and verifies `/health` on the remote host.
