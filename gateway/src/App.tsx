@@ -598,7 +598,7 @@ export function App() {
     <main className="shell">
       <header className="topbar">
         <div className="brand">
-          <span className="mark">◈</span>
+          <img className="brand-logo" src="/logo.webp" alt="" width="40" height="40" />
           <div>
             <b>MA'AT GATEWAY</b>
             <small>SERVER DEBUG CONSOLE</small>

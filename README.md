@@ -1,17 +1,12 @@
-# Maat Gateway Workspace
+# Maat JEV Gate
+
+![Maat JEV Gate banner showing the pre-signing gate for AI agents](docs/banner.webp)
+
+Maat is the pre-signing gate for AI agents that pay and trade. The agent holds no keys; every x402 payment and Uniswap swap is screened, weighed, and then signed, blocked, or sent to a World ID–verified human.
 
 Maat Gateway screens an Agent's x402 payments and swap intents before any payment is signed.
 
-## Flow
-
-```text
-Agent → Gateway → x402 Merchant (payment)
-                → Swap Guard → Uniswap (swap analysis)
-```
-
-The Agent sends authenticated intents to the Gateway and never receives its treasury key. For payments, the Gateway reads the Merchant's 402 quote, screens it with Intercepta, and evaluates the intent with JEV. `ALLOW` signs and settles the payment, `BLOCK` stops it, and `ESCALATE` waits for World ID approval. The Gateway observer shows decisions and lets the user confirm or cancel; its World callback is `https://gateway.maat-jev-gate.online/auth/world/callback`.
-
-For swaps, the Gateway forwards the intent to Swap Guard for a Uniswap quote and risk analysis. No trade is signed or broadcast.
+The Agent has no treasury key. The Gateway signs approved x402 payments; swap requests are analysis-only and never produce a signed or broadcast trade.
 
 ## Projects
 
@@ -21,10 +16,122 @@ For swaps, the Gateway forwards the intent to Swap Guard for a Uniswap quote and
 | Maat Agent | [`agent-demo/`](agent-demo/) | [https://agent.maat-jev-gate.online](https://agent.maat-jev-gate.online) | Agent payment and swap demonstration | Gateway API |
 | Maat Merchant | [`x402-demo/merchant/`](x402-demo/merchant/) | [https://merchant.maat-jev-gate.online](https://merchant.maat-jev-gate.online) | x402 resource quotes and payment settlement | x402 |
 | Maat Swap Guard | [`swap-guard/`](swap-guard/) | [https://swap.maat-jev-gate.online](https://swap.maat-jev-gate.online) | Ethereum mainnet swap analysis; no trading execution | Uniswap, Intercepta, JEV |
-| Maat Demo | [`maat-demo/`](maat-demo/) | [https://demo.maat-jev-gate.online](https://demo.maat-jev-gate.online) | Combined view of the four main demos | Agent, Gateway, Merchant, Swap Guard pages |
 | x402 Client | [`x402-demo/client/`](x402-demo/client/) | — | Local MetaMask payment demo | MetaMask, Merchant API |
+| Maat Demo | [`maat-demo/`](maat-demo/) | [https://demo.maat-jev-gate.online](https://demo.maat-jev-gate.online) | Auxiliary three-column observer for the Agent, Gateway, and Merchant; columns can also load Swap Guard | Agent, Gateway, Merchant, Swap Guard pages |
 
 DNS should point these hostnames to the deployment server. Caddy terminates HTTPS and routes each server application to its local Node port.
+
+## Flow
+
+```mermaid
+flowchart LR
+    A[Agent] --> G[Gateway]
+    G --> M[x402 Merchant]
+    G --> S[Swap Guard]
+    G --> W[World ID]
+    M --> F[x402 facilitator]
+    S --> U[Uniswap]
+    S --> E[Ethereum mainnet RPC and explorers]
+    G --> I[Intercepta]
+    S --> I
+    G --> J[JEV]
+    S --> J
+```
+
+The Agent sends authenticated intents to the Gateway and never receives its treasury key. For payments, the Gateway reads the Merchant's 402 quote, screens it with Intercepta, and evaluates the intent with JEV. `ALLOW` signs and settles the payment, `BLOCK` stops it, and `ESCALATE` waits for World ID approval. The Gateway observer shows decisions and lets the user confirm or cancel; its World callback is `https://gateway.maat-jev-gate.online/auth/world/callback`.
+
+For swaps, the Gateway forwards the intent to Swap Guard for a Uniswap quote and risk analysis. No trade is signed or broadcast.
+
+### Payment sequence
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant Gateway
+    participant Merchant as x402 Merchant
+    participant Intercepta
+    participant JEV
+    participant Human
+    participant World as World ID
+    participant Facilitator as x402 facilitator
+    Agent->>Gateway: Authenticated payment intent
+    Gateway->>Merchant: Request protected resource
+    Merchant-->>Gateway: HTTP 402 requirements
+    Gateway->>Intercepta: Screen recipient and token
+    Intercepta-->>Gateway: Risk clear
+    Gateway->>JEV: Evaluate intent against quote
+    JEV-->>Gateway: Intent match probability
+    Gateway->>Gateway: Classify as ESCALATE
+    Gateway-->>Agent: Pending decision and approval ID
+    Gateway-->>Human: Show pending approval
+    Human->>Gateway: Click Confirm with World ID
+    Gateway->>World: Start identity verification
+    World-->>Human: Request confirmation
+    Human->>World: Confirm identity
+    World-->>Gateway: Return authorization code via redirect
+    Gateway->>World: Exchange code for ID token
+    World-->>Gateway: ID token
+    Gateway->>Gateway: Verify identity and approve
+    Gateway->>Merchant: Re-fetch payment requirements
+    Merchant-->>Gateway: Matching HTTP 402 requirements
+    Gateway->>Intercepta: Re-check risk before signing
+    Intercepta-->>Gateway: Risk clear
+    Gateway->>Merchant: Send signed x402 payment
+    Merchant->>Facilitator: Verify and settle on Base Sepolia
+    Facilitator-->>Merchant: Settlement transaction hash
+    Merchant-->>Gateway: Paid resource and receipt
+    Agent->>Gateway: Poll decision
+    Gateway-->>Agent: Settled payment result
+```
+
+The Agent service owns Gateway credentials and exposes fixed scenarios to its browser UI. The Merchant returns payment requirements before it calls the facilitator to verify and settle a signed payment. The Gateway stores payment decisions and approvals in a local JSON history file.
+
+### Swap analysis sequence
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant Gateway
+    participant Guard as Swap Guard
+    participant Chain as Ethereum mainnet
+    participant Uniswap
+    participant Intercepta
+    participant Explorer as Block explorers
+    participant JEV
+    participant Human
+    participant World as World ID
+    Agent->>Gateway: Authenticated swap intent
+    Gateway->>Guard: Analyze ETH to token swap
+    Guard->>Chain: Read token and ETH price
+    Chain-->>Guard: Token metadata and price
+    Guard->>Uniswap: Request quote and price impact
+    Uniswap-->>Guard: Swap quote
+    Guard->>Intercepta: Scan output token
+    Intercepta-->>Guard: Token risk
+    Guard->>Explorer: Read deployer and funding history
+    Explorer-->>Guard: Deployer evidence
+    Guard->>Intercepta: Scan related addresses
+    Intercepta-->>Guard: Address risk
+    Guard->>Guard: Apply hard rules
+    Guard->>JEV: Evaluate quote and risk evidence
+    JEV-->>Guard: ESCALATE
+    Guard-->>Gateway: ESCALATE with analysis evidence
+    Gateway->>Gateway: Create approval for swap analysis
+    Gateway-->>Agent: Pending decision and approval ID
+    Gateway-->>Human: Show pending approval
+    Human->>Gateway: Click Confirm with World ID
+    Gateway->>World: Start identity verification
+    World-->>Human: Request confirmation
+    Human->>World: Confirm identity
+    World-->>Gateway: Return authorization code via redirect
+    Gateway->>World: Exchange code for ID token
+    World-->>Gateway: ID token
+    Gateway->>Gateway: Verify identity and approve analysis
+    Agent->>Gateway: Poll approval
+    Gateway-->>Agent: Approved analysis, no trade executed
+```
+
+Swap Guard uses the Uniswap Trading API when configured and otherwise quotes v2/v3 contracts through mainnet RPC. It checks token and deployer risk, traces funding with explorer data, applies hard rules, and asks JEV when the rules leave a decision open. An `ESCALATE` can receive World approval for the analysis, but still does not execute a swap.
 
 ## Sponsor integration code
 
