@@ -21,7 +21,13 @@ The Agent has no treasury key. The Gateway signs approved x402 payments; swap re
 
 DNS should point these hostnames to the deployment server. Caddy terminates HTTPS and routes each server application to its local Node port.
 
-## Flow
+## Overview
+
+The included Agent is a demo that sends authenticated payment and swap intents to the Gateway over HTTP. Its service owns Gateway credentials and exposes fixed scenarios to its browser UI. A real agent can use the same Gateway API through a skill or MCP server.
+
+For payments, the Gateway calls the Merchant, Intercepta, JEV, and World ID as needed; the Merchant calls the x402 facilitator for settlement. For swaps, the Gateway calls Swap Guard, which gathers quotes and risk evidence from Uniswap, Ethereum data sources, Intercepta, and JEV.
+
+Decisions return one of three verdicts: `ALLOW` accepts the intent, `BLOCK` rejects it, and `ESCALATE` requires human approval through World ID.
 
 ```mermaid
 flowchart LR
@@ -38,11 +44,29 @@ flowchart LR
     S --> J
 ```
 
-The Agent sends authenticated intents to the Gateway and never receives its treasury key. For payments, the Gateway reads the Merchant's 402 quote, screens it with Intercepta, and evaluates the intent with JEV. `ALLOW` signs and settles the payment, `BLOCK` stops it, and `ESCALATE` waits for World ID approval. The Gateway observer shows decisions and lets the user confirm or cancel; its World callback is `https://gateway.maat-jev-gate.online/auth/world/callback`.
+## Payment Detail
 
-For swaps, the Gateway forwards the intent to Swap Guard for a Uniswap quote and risk analysis. No trade is signed or broadcast.
+The Gateway reads the Merchant's 402 quote, screens it with Intercepta, and evaluates the payment intent with JEV. The Agent never receives the treasury key. The Gateway observer shows decisions and lets the user confirm or cancel pending approvals.
 
-### Payment sequence
+The payment account used for Base Sepolia x402 interactions is [`0xcF70836E1E32795B5874E54f903F2466ceBA9cb4`](https://sepolia.basescan.org/address/0xcF70836E1E32795B5874E54f903F2466ceBA9cb4). Its private key is deployed on the Gateway server as the server-only `MAAT_TREASURY_PRIVATE_KEY`.
+
+The Merchant returns payment requirements before it calls the facilitator to verify and settle a signed payment. The Gateway stores payment decisions and approvals in a local JSON history file.
+
+```text
+Agent
+	`-- Payment intent -> Gateway
+		|-- Merchant -> HTTP 402 quote
+		|-- Intercepta -> Screen recipient and token
+		|-- JEV -> Evaluate intent
+		`-- Decision
+			|-- ALLOW -> Gateway signs -> Merchant settles
+			|-- BLOCK -> Payment stopped
+			`-- ESCALATE -> User decision
+				|-- Approve -> World ID verification -> Gateway rechecks and signs -> Merchant settles
+				`-- Reject -> Payment cancelled; nothing signed
+```
+
+The detailed sequence below shows an `ESCALATE` payment approved by the user:
 
 ```mermaid
 sequenceDiagram
@@ -84,9 +108,27 @@ sequenceDiagram
     Gateway-->>Agent: Settled payment result
 ```
 
-The Agent service owns Gateway credentials and exposes fixed scenarios to its browser UI. The Merchant returns payment requirements before it calls the facilitator to verify and settle a signed payment. The Gateway stores payment decisions and approvals in a local JSON history file.
+## Swap Detail
 
-### Swap analysis sequence
+The Gateway forwards swap intents to Swap Guard for a Uniswap quote and risk analysis. No trade is signed or broadcast.
+
+Swap Guard uses the Uniswap Trading API when configured and otherwise quotes v2/v3 contracts through mainnet RPC. It checks token and deployer risk, traces funding with explorer data, applies hard rules, and asks JEV when the rules leave a decision open.
+
+```text
+Agent
+	`-- Swap intent -> Gateway -> Swap Guard
+		|-- Ethereum mainnet -> Token data and ETH price
+		|-- Uniswap -> Quote and price impact
+		|-- Intercepta and explorers -> Token, address, and deployer risk
+		|-- Hard rules, then JEV if needed
+		`-- Decision -> Gateway
+			|-- ALLOW / BLOCK -> Return analysis to Agent
+			`-- ESCALATE -> User decision
+				|-- Approve -> World ID verification -> Release approved analysis
+				`-- Reject -> Cancel analysis approval
+```
+
+The detailed sequence below shows an `ESCALATE` swap analysis approved by the user:
 
 ```mermaid
 sequenceDiagram
@@ -130,8 +172,6 @@ sequenceDiagram
     Agent->>Gateway: Poll approval
     Gateway-->>Agent: Approved analysis, no trade executed
 ```
-
-Swap Guard uses the Uniswap Trading API when configured and otherwise quotes v2/v3 contracts through mainnet RPC. It checks token and deployer risk, traces funding with explorer data, applies hard rules, and asks JEV when the rules leave a decision open. An `ESCALATE` can receive World approval for the analysis, but still does not execute a swap.
 
 ## Sponsor integration code
 
