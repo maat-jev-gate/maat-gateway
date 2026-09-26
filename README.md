@@ -44,6 +44,10 @@ DNS should point these hostnames to the deployment server. Caddy terminates HTTP
 
 [Integration feedback](FEEDBACK.md#intercepta)
 
+### Uniswap
+
+[Integration feedback](FEEDBACK.md#uniswap)
+
 ## Deploy Gateway
 
 The Gateway deploys with PM2 and Caddy. Fill the deployment and production integration values in the ignored `gateway/.env`, then run:
