@@ -93,7 +93,7 @@ export function App() {
   }
 
   return <main className="shell">
-    <header className="topbar"><div className="brand"><span className="mark">◈</span><div><b>MA'AT AGENT</b><small>PAYMENT AND SWAP DEMO</small></div></div><span className={`status ${runningId ? "running" : ""}`}><i />{runningId ? "RUNNING" : "READY"}</span></header>
+    <header className="topbar"><div className="brand"><span className="mark" aria-hidden="true">A</span><div><b>MA'AT AGENT</b><small>PAYMENT AND SWAP DEMO</small></div></div><span className={`status ${runningId ? "running" : ""}`}><i />{runningId ? "RUNNING" : "READY"}</span></header>
     <section className="workspace">
       <div className="intro"><p className="eyebrow">AGENT WORKSPACE</p><h1>Agent intents, routed through <em>Ma'at</em>.</h1></div>
       <div className="agent-card"><div className="agent-head"><div className="orb">✦</div><div><b>Atlas Data Buyer</b><span>agentId: maat-demo-agent</span></div><span className="badge">DEMO</span></div>
