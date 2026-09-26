@@ -30,6 +30,8 @@ test("screens the recipient and the Base mainnet USDC proxy before allowing paym
   };
   const risk = await checkPaymentRisk(requirements);
   assert.equal(risk.status, "clear");
+  assert.equal(risk.toxicScore, 0);
+  assert.deepEqual(risk.traits, []);
   assert.equal(risk.scans.length, 2);
   assert.deepEqual(risk.scans.map((scan) => scan.request.method), ["GET", "GET"]);
   assert.deepEqual(risk.scans.map((scan) => scan.response), [{ toxicScore: 0, traits: [] }, { action: "allow", riskLevel: "low", category: "legitimate" }]);
@@ -42,11 +44,19 @@ test("blocks a risky recipient without needing a token verdict", async () => {
   process.env.INTERCEPTA_API_KEY = "test-key";
   process.env.INTERCEPTA_CACHE = "off";
   globalThis.fetch = async (input) => Response.json(String(input).includes("quick-scan")
-    ? { toxicScore: 90, traits: [{ name: "known_scammer", risk: 90 }] }
+    ? { toxicScore: 90, traits: [
+      { name: "known_scammer", risk: 90, description: "Confirmed malicious activity." },
+      { name: "attack_money_target", risk: 85, description: "Received funds tied to exploits." },
+    ] }
     : { action: "allow", riskLevel: "low" });
   const risk = await checkPaymentRisk(requirements);
   assert.equal(risk.status, "blocked");
   assert.match(risk.reasons.join(" "), /toxic score 90/);
+  assert.equal(risk.toxicScore, 90);
+  assert.deepEqual(risk.traits, [
+    { name: "known_scammer", description: "Confirmed malicious activity." },
+    { name: "attack_money_target", description: "Received funds tied to exploits." },
+  ]);
 });
 
 test("does not clear payment when Intercepta is unavailable", async () => {
@@ -54,4 +64,16 @@ test("does not clear payment when Intercepta is unavailable", async () => {
   const risk = await checkPaymentRisk(requirements);
   assert.equal(risk.status, "unavailable");
   assert.match(risk.reasons[0], /INTERCEPTA_API_KEY/);
+});
+
+test("keeps the address score when the token scan fails", async () => {
+  process.env.INTERCEPTA_API_KEY = "test-key";
+  process.env.INTERCEPTA_CACHE = "off";
+  globalThis.fetch = async (input) => String(input).includes("quick-scan")
+    ? Response.json({ toxicScore: 0, traits: [] })
+    : new Response(null, { status: 503 });
+  const risk = await checkPaymentRisk(requirements);
+  assert.equal(risk.status, "unavailable");
+  assert.equal(risk.toxicScore, 0);
+  assert.deepEqual(risk.traits, []);
 });

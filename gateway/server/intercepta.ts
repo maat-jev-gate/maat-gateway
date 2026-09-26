@@ -9,6 +9,8 @@ const cache = new Map<string, { expiresAt: number; response: unknown }>();
 export type RiskCheck = {
   status: "clear" | "blocked" | "unavailable";
   reasons: string[];
+  toxicScore?: number;
+  traits?: { name: string; description: string }[];
   scans: { kind: "address" | "token"; address: string; chainId?: number; cached: boolean; request: { method: "GET"; path: string }; response: unknown }[];
   ms: number;
 };
@@ -23,18 +25,20 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.toLowerCase() : "";
 }
 
-export function addressRisk(response: unknown): string | undefined {
+export function addressRisk(response: unknown): { toxicScore: number; traits: NonNullable<RiskCheck["traits"]>; reason?: string } {
   const body = record(response);
   const score = body.toxicScore;
   if (typeof score !== "number" || !Number.isFinite(score) || !Array.isArray(body.traits)) throw new Error("Intercepta returned an invalid address scan.");
-  if (score >= 80) return `recipient toxic score ${score}`;
+  const traits: NonNullable<RiskCheck["traits"]> = [];
+  let flaggedTrait: string | undefined;
   for (const item of body.traits) {
     const trait = record(item);
     const code = text(trait.name).replace(/\s+/g, "_") || text(trait.code).replace(/\s+/g, "_");
     const risk = text(trait.risk);
-    if (HIGH_TRAITS.has(code) || HIGH_TRAITS.has(risk)) return `recipient flagged ${code || risk}`;
+    if (code) traits.push({ name: code, description: typeof trait.description === "string" ? trait.description.trim() : "" });
+    if (!flaggedTrait && (HIGH_TRAITS.has(code) || HIGH_TRAITS.has(risk))) flaggedTrait = code || risk;
   }
-  return undefined;
+  return { toxicScore: score, traits, reason: score >= 80 ? `recipient toxic score ${score}` : flaggedTrait ? `recipient flagged ${flaggedTrait}` : undefined };
 }
 
 export function tokenRisk(response: unknown): string | undefined {
@@ -65,16 +69,17 @@ export async function checkPaymentRisk(requirements: Requirements, signal?: Abor
   const startedAt = performance.now();
   const scans: RiskCheck["scans"] = [];
   const reasons: string[] = [];
+  let address: ReturnType<typeof addressRisk> | undefined;
   try {
     if (!isAddress(requirements.payTo) || !isAddress(requirements.asset)) throw new Error("Invalid x402 recipient or token address.");
     const chainId = Number(requirements.network.match(/^eip155:(\d+)$/)?.[1]);
     if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Invalid x402 network for Intercepta screening.");
-    const address = requirements.payTo.toLowerCase();
-    const addressPath = `/api/public/v2/extension/account/${address}/quick-scan`;
+    const recipient = requirements.payTo.toLowerCase();
+    const addressPath = `/api/public/v2/extension/account/${recipient}/quick-scan`;
     const addressScan = await get(addressPath, signal);
-    scans.push({ kind: "address", address, request: { method: "GET", path: addressPath }, ...addressScan });
-    const addressFlag = addressRisk(addressScan.response);
-    if (addressFlag) reasons.push(addressFlag);
+    scans.push({ kind: "address", address: recipient, request: { method: "GET", path: addressPath }, ...addressScan });
+    address = addressRisk(addressScan.response);
+    if (address.reason) reasons.push(address.reason);
 
     const token = chainId === 84532 && requirements.asset.toLowerCase() === BASE_SEPOLIA_USDC.toLowerCase()
       ? { address: BASE_MAINNET_USDC.toLowerCase(), chainId: 8453 }
@@ -86,9 +91,9 @@ export async function checkPaymentRisk(requirements: Requirements, signal?: Abor
       const tokenFlag = tokenRisk(tokenScan.response);
       if (tokenFlag) reasons.push(tokenFlag);
     }
-    return { status: reasons.length ? "blocked" : "clear", reasons, scans, ms: Math.round(performance.now() - startedAt) };
+    return { status: reasons.length ? "blocked" : "clear", reasons, toxicScore: address.toxicScore, traits: address.traits, scans, ms: Math.round(performance.now() - startedAt) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Intercepta screening failed.";
-    return { status: "unavailable", reasons: [message], scans, ms: Math.round(performance.now() - startedAt) };
+    return { status: "unavailable", reasons: [message], toxicScore: address?.toxicScore, traits: address?.traits, scans, ms: Math.round(performance.now() - startedAt) };
   }
 }
