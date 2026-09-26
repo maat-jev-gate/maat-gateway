@@ -43,6 +43,7 @@ async function forward(response: Response, reply: FastifyReply) {
 
 app.get("/health", async () => ({ ok: true, service: "maat-agent-demo" }));
 app.get("/api/demo/gateway", async () => ({ url: gatewayUrl.origin, endpoints: gatewayPaths }));
+app.get("/api/demo/world/config", async (_request, reply) => forward(await gatewayRequest("/api/world/config"), reply));
 app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay/:index", async (request, reply) => {
   const scenario = scenarios.find((item) => item.id === request.params.id);
   const index = Number(request.params.index);
@@ -50,10 +51,18 @@ app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay
     return reply.code(400).send({ error: "Invalid payment scenario or call." });
   }
   const call = scenario.calls[index];
+  if (scenario.id === "payment-escalate") {
+    const settingsResponse = await gatewayRequest("/api/maat/settings");
+    if (!settingsResponse.ok) return forward(settingsResponse, reply);
+    const settings = await settingsResponse.json() as { bypassJev?: boolean; jevBypassVerdict?: string };
+    if (!settings.bypassJev || settings.jevBypassVerdict !== "ESCALATE") {
+      return reply.code(409).send({ error: "For this scenario, enable Bypass JEV and select Escalate in the Gateway Debug Panel." });
+    }
+  }
   const response = await gatewayRequest(gatewayPaths.pay, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.id === "payment-allow" ? `${scenario.task} This specific payment is for ${call.label} at ${call.amountUsd} USDC.` : scenario.task, purpose: call.purpose, taskId: `demo-${scenario.id}` }),
+    body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.task, purpose: call.purpose, taskId: `demo-${scenario.id}` }),
   });
   return forward(response, reply);
 });
@@ -70,6 +79,10 @@ app.post<{ Params: { id: string } }>("/api/demo/scenarios/:id/swap", async (requ
 app.get<{ Params: { id: string } }>("/api/demo/decisions/:id", async (request, reply) => {
   if (!/^[0-9a-f-]{36}$/i.test(request.params.id)) return reply.code(400).send({ error: "Invalid decision ID." });
   return forward(await gatewayRequest(`/api/maat/decisions/${request.params.id}`), reply);
+});
+app.get<{ Params: { id: string } }>("/api/demo/approvals/:id", async (request, reply) => {
+  if (!/^[0-9a-f-]{36}$/i.test(request.params.id)) return reply.code(400).send({ error: "Invalid approval ID." });
+  return forward(await gatewayRequest(`/api/maat/approvals/${request.params.id}`), reply);
 });
 
 app.register(fastifyStatic, { root: fileURLToPath(new URL("./dist", import.meta.url)) });

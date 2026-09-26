@@ -4,6 +4,7 @@ import fastifyCors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { privateKeyToAccount } from "viem/accounts";
@@ -72,8 +73,27 @@ type PaymentRequirements = { scheme: "exact"; network: string; asset: string; am
 
 const port = Number(process.env.PORT ?? 8787);
 const staticRoot = fileURLToPath(new URL("../dist", import.meta.url));
-const decisions: Decision[] = [];
-const approvals = new Map<string, Approval>();
+const dataDir = fileURLToPath(new URL("../data/", import.meta.url));
+const historyFile = join(dataDir, "history.json");
+function loadHistory(): { decisions: Decision[]; approvals: Approval[] } {
+  try {
+    const parsed = JSON.parse(readFileSync(historyFile, "utf8")) as { decisions?: Decision[]; approvals?: Approval[] };
+    if (!Array.isArray(parsed.decisions) || !Array.isArray(parsed.approvals)) throw new Error("Invalid Gateway history file.");
+    return { decisions: parsed.decisions, approvals: parsed.approvals };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { decisions: [], approvals: [] };
+    throw error;
+  }
+}
+const history = loadHistory();
+const decisions: Decision[] = history.decisions;
+const approvals = new Map(history.approvals.map((approval) => [approval.id, approval]));
+function saveHistory() {
+  mkdirSync(dataDir, { recursive: true });
+  const temporary = `${historyFile}.tmp`;
+  writeFileSync(temporary, JSON.stringify({ decisions, approvals: [...approvals.values()] }, null, 2));
+  renameSync(temporary, historyFile);
+}
 const worldAttempts = new Map<string, { approvalId: string; intentHash: string; nonce: string; verifier: string; startedAt: number }>();
 const app = Fastify({ logger: true, disableRequestLogging: true, bodyLimit: 64_000 });
 app.register(fastifyCors, { origin: true, methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["Authorization", "Content-Type"] });
@@ -114,7 +134,7 @@ function intentHash(input: PayRequest): string {
 
 function addDecision(decision: Decision) {
   decisions.unshift(decision);
-  if (decisions.length > 100) decisions.pop();
+  saveHistory();
 }
 
 async function settleDecisionPayment(decision: Decision, input: PayRequest, quote: MerchantResult, startedAt: number) {
@@ -138,6 +158,7 @@ async function settleDecisionPayment(decision: Decision, input: PayRequest, quot
     decision.reasons.push(message);
   } finally {
     decision.timings.totalMs = Math.round(performance.now() - startedAt);
+    if (decisions.includes(decision)) saveHistory();
     clearTimeout(timeout);
   }
 }
@@ -299,6 +320,14 @@ async function evaluateWithJev(input: PayRequest, merchant: Partial<MerchantResu
 
 app.get("/health", async () => ({ ok: true, service: "maat-gateway", decisions: decisions.length }));
 app.get("/api/maat/decisions", async () => ({ decisions: decisions.map(publicDecision) }));
+app.delete("/api/maat/history", async (request, reply) => {
+  if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
+  decisions.length = 0;
+  approvals.clear();
+  worldAttempts.clear();
+  saveHistory();
+  return { cleared: true };
+});
 app.get<{ Params: { id: string } }>("/api/maat/decisions/:id", async (request, reply) => {
   const decision = decisions.find((item) => item.id === request.params.id);
   if (!decision) return reply.code(404).send({ error: "Decision not found." });
@@ -349,7 +378,7 @@ app.post<{ Body: { scenario?: DemoScenario; purpose?: string } }>("/api/maat/dem
 app.get<{ Params: { id: string } }>("/api/maat/approvals/:id", async (request, reply) => {
   const approval = approvals.get(request.params.id);
   if (!approval) return reply.code(404).send({ error: "Approval not found." });
-  if (approval.status === "pending" && Date.now() > Date.parse(approval.expiresAt)) approval.status = "expired";
+  if (approval.status === "pending" && Date.now() > Date.parse(approval.expiresAt)) { approval.status = "expired"; saveHistory(); }
   return approval;
 });
 
@@ -382,6 +411,7 @@ app.post<{ Params: { id: string } }>("/api/maat/approvals/:id/resolve", async (r
       }
     }
   }
+  saveHistory();
   return approval;
 });
 
@@ -405,7 +435,7 @@ app.get<{ Querystring: { code?: string; state?: string; error?: string; error_de
   if (state) worldAttempts.delete(state);
   const approval = attempt ? approvals.get(attempt.approvalId) : undefined;
   const failure = (message: string) => {
-    if (approval?.status === "pending") approval.status = "rejected";
+    if (approval?.status === "pending") { approval.status = "rejected"; saveHistory(); }
     return reply.type("text/html; charset=utf-8").header("Cache-Control", "no-store").send(worldResultPage("failure", message));
   };
   if (error || !code || !state || !attempt) return failure(errorDescription || error || "The World ID verification session expired.");
@@ -439,12 +469,15 @@ app.get<{ Querystring: { code?: string; state?: string; error?: string; error_de
           decision.paymentStatus = "failed";
           decision.error = message;
           decision.reasons.push(message);
+          saveHistory();
         });
       }
     }
+    saveHistory();
     return reply.type("text/html; charset=utf-8").header("Cache-Control", "no-store").send(worldResultPage("success", "Return to the Gateway window to see the approval update."));
   } catch (caught) {
     approval.status = "rejected";
+    saveHistory();
     return failure(caught instanceof Error ? caught.message : "World ID verification failed.");
   }
 });

@@ -24,6 +24,7 @@ export function App() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [confirmClear, setConfirmClear] = useState(false);
   const [demoPurpose, setDemoPurpose] = useState("Purchase one Atlas dataset");
   const [approvals, setApprovals] = useState<Record<string, Approval>>({});
   const dirty = JSON.stringify(settings) !== JSON.stringify(draft);
@@ -55,6 +56,16 @@ export function App() {
       const current = await response.json() as Settings;
       setSettings(current); setDraft(current); setNotice("Settings applied on the Gateway server.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Gateway settings could not be applied."); }
+  }
+
+  async function clearHistory() {
+    setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/maat/history", { method: "DELETE", headers: { Authorization: gatewayAuth() } });
+      if (response.status === 401) gatewayCredentials = "";
+      if (!response.ok) throw new Error("Gateway history could not be cleared.");
+      setDecisions([]); setApprovals({}); setConfirmClear(false); setNotice("Gateway history cleared.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Gateway history could not be cleared."); }
   }
 
   async function runDemo(scenario: "allow" | "block" | "escalate") {
@@ -92,9 +103,9 @@ export function App() {
   return <main className="shell">
     <header className="topbar"><div className="brand"><span className="mark">◈</span><div><b>MA'AT GATEWAY</b><small>SERVER DEBUG CONSOLE</small></div></div><span className={`status ${running ? "running" : ""}`}><i />{running ? "REQUESTING" : "POLLING"}</span></header>
     <section className="workspace">
-      <section className="decision-card"><div className="card-head"><span>LIVE DECISIONS</span><span className="live"><i /> AUTO REFRESH · 2S</span></div><div className="stream">{decisions.length === 0 ? <div className="empty"><strong>Waiting for an Agent request</strong><p>Use the Debug Panel below, then send a request through the Agent or use a Demo Request.</p></div> : decisions.map(renderDecision)}</div></section>
+      <section className="decision-card"><div className="card-head"><span>LIVE DECISIONS</span><div className="history-actions"><span className="live"><i /> AUTO REFRESH · 2S</span><button type="button" onClick={() => setConfirmClear(true)} disabled={decisions.length === 0}>Clear History</button></div></div><div className="stream">{decisions.length === 0 ? <div className="empty"><strong>Waiting for an Agent request</strong><p>Use the Debug Panel below, then send a request through the Agent or use a Demo Request.</p></div> : decisions.map(renderDecision)}</div></section>
       <section className="debug-panel"><div className="panel-title"><div><span className="eyebrow">GATEWAY DEBUG PANEL</span></div></div><div className="settings-grid"><label>Merchant URL<input type="url" value={draft.merchantUrl} onChange={(event) => setDraft({ ...draft, merchantUrl: event.target.value })} /></label></div><div className="switches"><div className="settings-row"><label className="switch"><input type="checkbox" checked={draft.bypassMerchantRequest} onChange={(event) => setDraft({ ...draft, bypassMerchantRequest: event.target.checked })} /><span>Bypass Merchant</span></label></div><div className="settings-row"><label className="switch"><input type="checkbox" checked={draft.bypassJev} onChange={(event) => setDraft({ ...draft, bypassJev: event.target.checked })} /><span>Bypass JEV</span></label><label className="settings-result">JEV bypass result<select value={draft.jevBypassVerdict} onChange={(event) => setDraft({ ...draft, jevBypassVerdict: event.target.value as Settings["jevBypassVerdict"] })}><option value="ALLOW">Accept</option><option value="BLOCK">Reject</option><option value="ESCALATE">Escalate</option></select></label></div><div className="settings-row"><label className="switch"><input type="checkbox" checked={draft.bypassWorldId} onChange={(event) => setDraft({ ...draft, bypassWorldId: event.target.checked })} /><span>Bypass World ID</span></label><label className="settings-result">World ID bypass result<select value={draft.worldBypassVerdict} onChange={(event) => setDraft({ ...draft, worldBypassVerdict: event.target.value as Settings["worldBypassVerdict"] })}><option value="ALLOW">Auto approve</option><option value="BLOCK">Auto reject</option></select></label></div><div className="settings-row"><label className="switch"><input type="checkbox" checked={draft.bypassRealPayment} onChange={(event) => setDraft({ ...draft, bypassRealPayment: event.target.checked })} /><span>Bypass real payment</span></label></div></div><div className="panel-actions"><button className="apply-button" type="button" onClick={() => void applySettings()} disabled={!settingsReady || !dirty}>Apply settings</button></div><div className="demo-bar"><div className="demo-title">DEMO REQUESTS</div><label className="demo-purpose">Payment purpose<input value={demoPurpose} onChange={(event) => setDemoPurpose(event.target.value)} /></label><div className="demo-actions"><button type="button" className="demo-allow" onClick={() => void runDemo("allow")} disabled={running}>Accept</button><button type="button" className="demo-block" onClick={() => void runDemo("block")} disabled={running}>Decline</button><button type="button" className="demo-escalate" onClick={() => void runDemo("escalate")} disabled={running}>Escalate</button></div></div>{notice && <p className="settings-notice">{notice}</p>}</section>
       {error && <p className="error-note">{error}</p>}
-    </section><footer><span>MA'AT GATEWAY / SERVER DEBUG CONSOLE</span><span>Configuration is held by the server</span></footer>
+    </section>{confirmClear && <div className="confirm-backdrop" role="presentation"><div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-clear-title"><h2 id="confirm-clear-title">Clear Gateway history?</h2><p>This removes all saved decisions and approvals from this Gateway. It does not change settings or Merchant history.</p><div><button type="button" onClick={() => setConfirmClear(false)}>Cancel</button><button type="button" className="confirm-danger" onClick={() => void clearHistory()}>Clear History</button></div></div></div>}<footer><span>MA'AT GATEWAY / SERVER DEBUG CONSOLE</span><span>Configuration is held by the server</span></footer>
   </main>;
 }

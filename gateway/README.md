@@ -73,6 +73,8 @@ The Gateway uses `url` and `method` to contact the Merchant in `merchantRequest`
 
 An `ESCALATE` response has HTTP `202`, an `approvalId`, and an `intentHash`. The original intent is stored server-side. The browser polls `GET /api/maat/approvals/:id`; it never decides whether a request is approved.
 
+Gateway decisions and approvals are saved to the local, Git-ignored `data/history.json` file in development and production. The console's **Clear History** action asks for confirmation and then calls the authenticated `DELETE /api/maat/history` endpoint. It removes saved decisions and approvals without changing Gateway settings or Merchant records.
+
 ## World ID approval
 
 World ID uses the same OIDC + PKCE pattern as [`../world-demo`](../world-demo):
@@ -125,7 +127,7 @@ The Agent supplies `purpose` on every payment request. The Gateway console keeps
 
 The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. Authenticated console actions prompt the operator for Gateway credentials and keep them only in page memory. `Apply settings` sends the complete configuration to `POST /api/maat/settings`; the server returns the authoritative configuration and the UI replaces its local copy with that response. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
 
-The three buttons under **DEMO REQUESTS** call authenticated `POST /api/maat/demo`. This route is isolated from the external Agent contract and always runs as a dry run. It accepts `allow`, `block`, or `escalate` to rehearse the three UI states without depending on JEV output. External Agents use `POST /api/maat/pay`, where verdicts come from JEV or the current Gateway settings.
+The three buttons under **DEMO REQUESTS** call authenticated `POST /api/maat/demo`. This route is isolated from the external Agent contract and always runs as a dry run. It accepts `allow`, `block`, or `escalate` to rehearse the three UI states without depending on JEV output. External Agents use `POST /api/maat/pay`, where verdicts come from JEV or the current Gateway settings. The Agent's approval scene uses the Debug Panel JEV bypass with an ESCALATE result; this setting must be turned off before demonstrating live JEV decisions again.
 
 ## Verification
 

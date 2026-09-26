@@ -10,3 +10,5 @@
 .apply-button:disabled{cursor:not-allowed}
 @media(max-width:720px){.panel-actions{padding-left:16px;padding-right:16px}.panel-actions .apply-button{width:auto;margin-top:0}}
 .error-note{width:auto;margin-left:0;margin-right:0}
+.history-actions{display:flex;align-items:center;gap:15px}.history-actions button{height:28px;padding:0 9px;border-color:#e4aaa5;color:var(--red);background:#fff;font-size:11px}.history-actions button:disabled{cursor:not-allowed}
+.confirm-backdrop{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(20,32,30,.5)}.confirm-dialog{width:min(420px,calc(100% - 32px));padding:24px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 24px 60px rgba(10,30,25,.2)}.confirm-dialog h2{margin:0;font-size:19px}.confirm-dialog p{font-size:13px;line-height:1.55;color:var(--muted)}.confirm-dialog>div{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}.confirm-dialog .confirm-danger{color:#fff;background:var(--red);border-color:var(--red)}

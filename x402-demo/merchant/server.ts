@@ -3,6 +3,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 config();
 
@@ -12,6 +13,7 @@ const asset = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 const facilitatorUrl = (process.env.FACILITATOR_URL ?? "https://x402.org/facilitator").replace(/\/$/, "");
 const payTo = process.env.MERCHANT_PAY_TO?.trim() ?? "";
 const allowUnsignedPayment = process.env.DEMO_ALLOW_UNSIGNED_PAYMENT === "true";
+const historyPassword = process.env.MERCHANT_HISTORY_PASSWORD?.trim() ?? "";
 
 type Product = {
   id: string;
@@ -49,7 +51,7 @@ const products: Record<string, Product> = {
 };
 
 const app = Fastify({ logger: true });
-const events: Array<{
+type MerchantEvent = {
   id: string;
   createdAt: string;
   method: string;
@@ -61,11 +63,29 @@ const events: Array<{
   txHash?: string;
   demo: boolean;
   message: string;
-}> = [];
+};
+const dataDir = fileURLToPath(new URL("./data/", import.meta.url));
+const historyFile = join(dataDir, "history.json");
+function loadEvents(): MerchantEvent[] {
+  try {
+    const parsed = JSON.parse(readFileSync(historyFile, "utf8")) as { events?: MerchantEvent[] };
+    if (!Array.isArray(parsed.events)) throw new Error("Invalid Merchant history file.");
+    return parsed.events;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+const events = loadEvents();
+function saveEvents() {
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(`${historyFile}.tmp`, JSON.stringify({ events }, null, 2));
+  renameSync(`${historyFile}.tmp`, historyFile);
+}
 
-function addEvent(event: Omit<(typeof events)[number], "id" | "createdAt">) {
+function addEvent(event: Omit<MerchantEvent, "id" | "createdAt">) {
   events.unshift({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...event });
-  if (events.length > 50) events.pop();
+  saveEvents();
 }
 
 function encodeBase64Json(value: unknown): string {
@@ -168,6 +188,17 @@ app.register(fastifyStatic, { root: join(fileURLToPath(new URL(".", import.meta.
 
 app.get("/health", async () => ({ ok: true, service: "maat-x402-vendor", network, configured: Boolean(payTo) }));
 app.get("/api/merchant/events", async () => ({ events, payTo, network, asset }));
+app.delete("/api/merchant/history", async (request, reply) => {
+  if (!historyPassword) return reply.code(503).send({ error: "Merchant history credentials are not configured." });
+  const authorization = request.headers.authorization;
+  const expected = `Basic ${Buffer.from(`operator:${historyPassword}`).toString("base64")}`;
+  if (authorization !== expected) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-merchant-history").send({ error: "Merchant history authentication failed." });
+  if (request.headers["x-clear-history"] !== "confirmed") return reply.code(400).send({ error: "Clear confirmation is required." });
+  if (!request.headers.origin || new URL(request.headers.origin).host !== request.headers.host) return reply.code(403).send({ error: "Same-origin request required." });
+  events.length = 0;
+  saveEvents();
+  return { cleared: true };
+});
 
 app.get<{ Params: { id: string } }>("/vendor/atlas/dataset/:id", async (request, reply) => {
   const product = products.dataset;

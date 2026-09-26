@@ -1,15 +1,18 @@
 # Maat Agent Demo
 
-The Agent interface presents four independent scenes from the demo script:
+The Agent interface presents five independent scenes from the demo script:
 
 | Scene | Gateway endpoint | Current behavior |
 | --- | --- | --- |
-| Pay for datasets | `POST /api/maat/pay` | Sends three x402 purchases to the live Merchant, one after another. |
+| Accept dataset purchase | `POST /api/maat/pay` | Buys one $0.001 dataset and displays the returned rows. |
 | Block verification fee | `POST /api/maat/pay` | Sends the Merchant's $80 verification request for a Gateway decision. |
+| Approve dataset purchase | `POST /api/maat/pay` | Buys one $0.001 dataset after a Gateway operator enables JEV bypass with the ESCALATE result and a human approves it. |
 | Swap with approval | `POST /api/maat/swap` | Reaches the swap endpoint, which currently returns HTTP 501. |
 | Block risky swap | `POST /api/maat/swap` | Reaches the swap endpoint, which currently returns HTTP 501. |
 
 The browser calls only the Agent service's same-origin `/api/demo/scenarios/*` routes. The Agent service keeps Gateway credentials in its ignored `.env`, sends the fixed scene intents to the Gateway, and forwards decisions. Its `/api/demo/gateway` route exposes only the configured public Gateway origin and pay/swap endpoint paths for display. The Merchant origin comes from `MERCHANT_BASE_URL`; the allowed resource paths are defined in `src/scenarios.ts`. Browser requests cannot choose a Merchant URL or payment amount. The Agent UI is open to visitors; Gateway credentials remain server-side.
+
+The approval scene uses the Gateway Debug Panel's existing **Bypass JEV** and **JEV bypass result: Escalate** settings. This produces a labeled fallback decision, not a JEV model result. The Agent rejects this scene when those settings are not enabled. After an approval, the Agent polls the original decision and shows the purchased data only after the Merchant payment completes. World ID must be configured on the Gateway for that approval to proceed.
 
 The current Agent adapter makes direct HTTP tool calls. An MCP server could expose the same `maat_pay` and `maat_swap` operations to general-purpose agents; this demo does not claim to use MCP today.
 

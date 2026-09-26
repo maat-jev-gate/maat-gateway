@@ -19,6 +19,13 @@
       .stat, .panel { background: #182026; border: 1px solid #2b343d; border-radius: 8px; }
       .stat { padding: 18px 20px; } .stat strong { display: block; font-size: 28px; margin-top: 8px; }
       .panel { overflow: hidden; } .panel-head { display: flex; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #2b343d; }
+      .panel-actions { display: flex; align-items: center; gap: 16px; }
+      button { cursor: pointer; color: #e9edf2; background: #29343d; border: 1px solid #49545d; border-radius: 4px; padding: 7px 11px; font: 12px Inter, ui-sans-serif, system-ui, sans-serif; }
+      button:disabled { opacity: .5; cursor: default; }
+      dialog { color: #e9edf2; background: #182026; border: 1px solid #49545d; border-radius: 8px; padding: 24px; width: min(400px, calc(100% - 32px)); }
+      dialog::backdrop { background: rgba(0,0,0,.7); }
+      dialog h2 { margin: 0 0 10px; font-size: 20px; } dialog p { color: #9eaab5; font-size: 13px; line-height: 1.5; }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; } .danger { color: #fff; background: #a33f3b; border-color: #a33f3b; }
       table { width: 100%; border-collapse: collapse; text-align: left; } th, td { padding: 15px 20px; border-bottom: 1px solid #252e36; vertical-align: top; } th { font-size: 10px; font-weight: 500; } td { color: #d3dae0; font-size: 13px; } tr:last-child td { border-bottom: 0; }
       .status { color: #9bd9ba; } .status.required { color: #e3be7b; } code { color: #b8c6d2; font: 12px ui-monospace, monospace; word-break: break-all; }
       @media (max-width: 720px) { header { display: block; } .live { margin-top: 22px; } .stats { grid-template-columns: 1fr; } .panel { overflow-x: auto; } table { min-width: 760px; } }
@@ -28,8 +35,9 @@
     <main>
       <header><div><div class="eyebrow">x402 merchant / atlas vendor</div><h1>Settlement console</h1><p class="sub">Live requests received by the merchant service. A 402 is recorded first; settled payments appear with their payer and chain transaction.</p></div><div class="live"><i></i> Listening on Base Sepolia</div></header>
       <section class="stats"><div class="stat"><div class="eyebrow">Requests</div><strong id="requests">0</strong></div><div class="stat"><div class="eyebrow">Settled volume</div><strong id="volume">$0.00</strong></div><div class="stat"><div class="eyebrow">Merchant address</div><strong id="address" style="font-size:13px;line-height:1.5">Not configured</strong></div></section>
-      <section class="panel"><div class="panel-head"><span class="eyebrow">Recent activity</span><span class="meta" id="updated">Waiting for first request</span></div><table><thead><tr><th>Time</th><th>Request</th><th>Status</th><th>Amount</th><th>Payer</th><th>Settlement</th></tr></thead><tbody id="events"><tr><td colspan="6">No requests yet.</td></tr></tbody></table></section>
+      <section class="panel"><div class="panel-head"><span class="eyebrow">Recent activity</span><div class="panel-actions"><span class="meta" id="updated">Waiting for first request</span><button type="button" id="clear-history" disabled>Clear History</button></div></div><table><thead><tr><th>Time</th><th>Request</th><th>Status</th><th>Amount</th><th>Payer</th><th>Settlement</th></tr></thead><tbody id="events"><tr><td colspan="6">No requests yet.</td></tr></tbody></table></section>
     </main>
+    <dialog id="clear-dialog" aria-labelledby="clear-title"><h2 id="clear-title">Clear Merchant history?</h2><p>This removes all saved request and settlement records from this Merchant. Gateway decisions are kept.</p><div class="dialog-actions"><button type="button" id="cancel-clear">Cancel</button><button type="button" id="confirm-clear" class="danger">Clear History</button></div></dialog>
     <script>
       const short = (value) => value ? value.slice(0, 8) + "..." + value.slice(-6) : "-";
       const money = (value) => "$" + Number(value || 0).toFixed(4);
@@ -39,8 +47,28 @@
         document.querySelector("#volume").textContent = money(events.filter((event) => event.status === 200).reduce((sum, event) => sum + Number(event.amount), 0));
         document.querySelector("#address").textContent = body.payTo || "Not configured";
         document.querySelector("#updated").textContent = events[0] ? "Updated " + new Date(events[0].createdAt).toLocaleTimeString() : "Waiting for first request";
+        document.querySelector("#clear-history").disabled = events.length === 0;
         document.querySelector("#events").innerHTML = events.length ? events.map((event) => `<tr><td class="meta">${new Date(event.createdAt).toLocaleTimeString()}</td><td><strong>${event.method}</strong><br><code>${event.path}</code></td><td class="status ${event.status === 402 ? "required" : ""}">${event.status}<br><span class="meta">${event.message}</span></td><td>${money(event.amount)}</td><td><code>${short(event.payer)}</code></td><td><code>${short(event.txHash)}</code></td></tr>`).join("") : "<tr><td colspan=\"6\">No requests yet.</td></tr>";
       }
+      const dialog = document.querySelector("#clear-dialog");
+      let historyAuthorization = "";
+      document.querySelector("#clear-history").addEventListener("click", () => dialog.showModal());
+      document.querySelector("#cancel-clear").addEventListener("click", () => dialog.close());
+      document.querySelector("#confirm-clear").addEventListener("click", async () => {
+        const button = document.querySelector("#confirm-clear"); button.disabled = true;
+        try {
+          if (!historyAuthorization) {
+            const password = window.prompt("Merchant history password");
+            if (password === null) return;
+            historyAuthorization = "Basic " + btoa("operator:" + password);
+          }
+          const response = await fetch("/api/merchant/history", { method: "DELETE", headers: { authorization: historyAuthorization, "x-clear-history": "confirmed" } });
+          if (response.status === 401) historyAuthorization = "";
+          if (!response.ok) throw new Error("Merchant history could not be cleared.");
+          dialog.close(); await refresh();
+        } catch (error) { window.alert(error.message); }
+        finally { button.disabled = false; }
+      });
       refresh(); setInterval(refresh, 2000);
     </script>
   </body>
