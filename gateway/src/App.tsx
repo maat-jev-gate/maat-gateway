@@ -113,11 +113,14 @@ export function App() {
     checks.push({ name: "World ID", state: !decision.approvalId ? "idle" : approval?.status === "approved" ? "pass" : approval && approval.status !== "pending" ? "fail" : "waiting", note: decision.reasons.some((reason) => reason.includes("World ID bypass")) ? "Bypassed" : undefined, metric: decision.approvalId && (!approval || approval.status === "pending") ? "Pending" : undefined, request: approval?.worldApi?.request, response: approval?.worldApi?.response, error: approval?.worldApi?.error });
     const title = isPay ? `${decision.intent.method} ${new URL(decision.intent.url).pathname}` : `${decision.intent.tokenIn} → ${decision.intent.tokenOut}`;
     const outcome = decision.verdict === "ERROR" || (isPay && decision.paymentStatus === "failed") || (approval && ["rejected", "cancelled", "expired"].includes(approval.status)) ? "block" : approval?.status === "approved" ? "allow" : decision.verdict.toLowerCase();
+    const summary = decision.error ?? (isPay && decision.verdict === "BLOCK"
+      ? decision.reasons.find((reason) => reason.startsWith("Intercepta blocked:")) ?? decision.reasons.find((reason) => reason !== "Intercepta recipient check clear.")
+      : !isPay && decision.verdict !== "ALLOW" ? decision.reasons[0] : undefined);
     return <article className={`decision ${outcome}`} key={decision.id}>
       <div className="decision-top"><div><span className="decision-kicker">{isPay ? "PAYMENT" : "SWAP ANALYSIS"} · {decision.verdict}{approval?.status === "approved" ? " · APPROVED" : ""}</span><h2>{title}</h2></div></div>
       <p className="purpose">{decision.intent.purpose}</p>
       {isPay && requirement && <div className="merchant-quote"><b>MERCHANT QUOTE</b><span>{amount && `${amount} · `}Recipient <code>{requirement.payTo}</code></span>{(decision.demo || decision.reasons.some((reason) => reason.includes("Real payment is bypassed"))) && <small className="check-badge" tabIndex={0} data-tooltip={decision.demo ? "Gateway demo requests never submit payment." : "Real payment was bypassed in Gateway settings."}>Payment Bypassed</small>}</div>}
-      {(decision.error || (!isPay && decision.verdict !== "ALLOW" && decision.reasons[0])) && <p className="decision-summary">{decision.error ?? decision.reasons[0]}</p>}
+      {summary && <p className="decision-summary">{summary}</p>}
       <div className="check-grid">{checks.map((check) => {
         const status = check.state === "idle" ? "Not run" : check.state === "waiting" ? "Pending" : check.state === "escalate" ? "Escalate" : check.state === "pass" ? "Pass" : "Fail";
         const expandable = check.request !== undefined || check.response !== undefined || check.error !== undefined;

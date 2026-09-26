@@ -9,9 +9,9 @@
 
 ## Intercepta
 
-- Time to first API call: Not recorded.
+- Time to first API call: About 30 minutes.
 - Integration experience: The API worked well for screening payment recipients and tokens in the x402 flow.
-- Confusing behavior or missing capability: None encountered during this demo.
-- Suggested addition: Consider adding a browsable list of known-risk test addresses and their risk reasons to make blocked-payment testing easier.
+- What confused us: We initially could not find a way to reproduce a blocked payment; later, we found the known-risk addresses pinned in Intercepta's Discord channel.
+- What was missing: Consider an API endpoint that lists all known-risk addresses and why they are flagged. It could help integrations that need to discover risky addresses before they have a specific address to scan.
 
 ## Uniswap
