@@ -7,7 +7,7 @@ The Agent interface presents six independent scenes from the demo script:
 | Accept dataset purchase | `POST /api/maat/pay` | Buys one $0.001 dataset and displays the returned rows. |
 | Block verification fee | `POST /api/maat/pay` | Sends the Merchant's $80 verification request for a Gateway decision. |
 | Block risky recipient | `POST /api/maat/pay` | Requests a $0.001 x402 resource whose Merchant quote uses the configured risk recipient. Intercepta decides whether it is blocked. |
-| Approve dataset purchase | `POST /api/maat/pay` | Requests a $0.001 dataset with uncertain coverage. JEV evaluates the live quote; owner approval is required before payment. |
+| Escalate dataset purchase | `POST /api/maat/pay` | Requests a $0.001 dataset with uncertain coverage. JEV evaluates the live quote; owner approval is required before payment. |
 | Review ETH-to-USDC swap | `POST /api/maat/swap` | Requests a $30 mainnet analysis and displays the Guard's live verdict. `ESCALATE` creates a World ID approval; no trade runs. |
 | Screen a social token | `POST /api/maat/swap` | Requests a live ETH-to-PEPE analysis and displays the Guard's verdict and quote. No trade runs. |
 
