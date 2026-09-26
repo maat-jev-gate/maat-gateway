@@ -45,9 +45,9 @@ gateway/
 
 ## Agent, Gateway, and Merchant calls
 
-The Agent sends x402 requests to `POST /api/maat/pay` and swap intents to the separate `POST /api/maat/swap` endpoint. The pay endpoint contacts the Merchant and runs the current decision and settlement flow. The swap endpoint authenticates the Agent, then sends the mainnet intent to the standalone Swap Guard and returns its analysis decision. The Swap Guard owns the quote, risk checks, and JEV verdict. Its response has `analysisOnly: true`; Gateway does not sign or broadcast a swap or create a World ID approval for it.
+The Agent sends x402 requests to `POST /api/maat/pay` and swap intents to the separate `POST /api/maat/swap` endpoint. The pay endpoint contacts the Merchant and runs the current decision and settlement flow. The swap endpoint authenticates the Agent, then sends the mainnet intent to the standalone Swap Guard and records its analysis decision. The Swap Guard owns the quote, risk checks, and JEV verdict. An `ESCALATE` swap decision creates a Gateway World ID approval. Approval records consent for the analysis only; Gateway never signs or broadcasts a trade.
 
-Swap requests include `agentId`, `taskId`, `purpose`, `chainId: 1`, `tokenIn: "ETH"`, a mainnet ERC-20 `tokenOut` address, positive `amountUsd`, and `source` (`owner`, `vendor`, or `social`). Set `SWAP_GUARD_URL` to the Guard origin. The Gateway returns its decision JSON unchanged after checking that it belongs to the requested Agent and token. A Guard validation error returns HTTP 400; an unavailable or malformed Guard response returns HTTP 502, and a timeout returns HTTP 504.
+Swap requests include `agentId`, `taskId`, `purpose`, `chainId: 1`, `tokenIn: "ETH"`, a mainnet ERC-20 `tokenOut` address, positive `amountUsd`, and `source` (`owner`, `merchant`, or `social`). Set `SWAP_GUARD_URL` to the Guard origin. Gateway validates the Guard decision, adds its own approval ID when needed, stores it in decision history, and returns the result with `analysisOnly: true`. Guard errors are saved as `ERROR` records, without a trade or approval. A Guard validation error returns HTTP 400; an unavailable or malformed Guard response returns HTTP 502, and a timeout returns HTTP 504.
 
 The Agent implementation is in [`../agent-demo`](../agent-demo). It sends the following body to `POST /api/maat/pay` and adds an `Authorization: Basic ...` header from its local environment:
 
@@ -56,7 +56,7 @@ The Gateway enables CORS for the Agent's browser request, including the `Authori
 ```json
 {
   "agentId": "maat-demo-agent",
-  "url": "https://merchant.maat-jev-gate.online/vendor/atlas/dataset/demo-1",
+  "url": "https://merchant.maat-jev-gate.online/merchant/dataset/demo-1",
   "method": "GET",
   "purpose": "Purchase one Atlas dataset",
   "taskId": "gateway-smoke-test"
@@ -144,7 +144,7 @@ The Agent supplies `purpose` on every payment request. The Gateway console keeps
 
 The Merchant's x402 quote supplies the payment recipient. The Gateway screens that address with Intercepta and uses it to sign the payment. External Agents may also send `payTo` as an expected recipient; the Gateway blocks a mismatch with the quote.
 
-The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. `Apply settings` sends the complete configuration to `POST /api/maat/settings`; the server returns the authoritative configuration and the UI replaces its local copy with that response. Console actions do not prompt for credentials. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
+The Debug Panel edits Merchant URL, payment controls in call order (Merchant request, Intercepta, JEV, World ID, real payment), bypass results, and the Demo purpose locally. Intercepta bypass applies to payment recipient screening, including the check before settlement; Swap Guard retains its own live risk screening. `Apply settings` sends the complete configuration to `POST /api/maat/settings`; the server returns the authoritative configuration and the UI replaces its local copy with that response. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after a payment approval is accepted.
 
 The three buttons under **DEMO REQUESTS** call `POST /api/maat/demo`. This route is isolated from the external Agent contract and always runs as a dry run. It accepts `allow`, `block`, or `escalate` to rehearse the three UI states without depending on JEV output. External Agents use `POST /api/maat/pay`, where verdicts come from JEV, the current Gateway settings, or the labeled approval demo parameter.
 

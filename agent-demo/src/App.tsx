@@ -3,7 +3,7 @@ import { scenarios, type Scenario } from "./scenarios";
 
 type PurchasedData = { id?: string; title?: string; rows?: { key: string; value: string }[]; payment?: { txHash?: string; demo?: boolean } };
 type TimelineItem = { kind: "task" | "activity" | "decision" | "result" | "error"; text: string; label?: string; amountUsd?: number; verdict?: string; status?: string; elapsedMs?: number; data?: PurchasedData; approvalId?: string; decisionId?: string; decidedBy?: string; reasons?: string[] };
-type GatewayDecision = { id?: string; verdict?: string; paymentStatus?: string; error?: string; approvalId?: string; decidedBy?: string; reasons?: string[]; analysisOnly?: boolean; quote?: { route?: string; priceImpactPct?: number | null }; merchant?: { status?: number; requirements?: { payTo: string }[] | { payTo: string }; response?: PurchasedData } };
+type GatewayDecision = { id?: string; kind?: "pay" | "swap"; verdict?: string; paymentStatus?: string; error?: string; approvalId?: string; decidedBy?: string; reasons?: string[]; analysisOnly?: boolean; quote?: { route?: string; priceImpactPct?: number | null }; merchant?: { status?: number; requirements?: { payTo: string }[] | { payTo: string }; response?: PurchasedData } };
 type GatewayInfo = { url: string; endpoints: { pay: string; swap: string } };
 
 export function App() {
@@ -31,7 +31,7 @@ export function App() {
           fetch(`/api/demo/decisions/${item.decisionId}`).then(response => response.ok ? response.json() as Promise<GatewayDecision> : Promise.reject()),
           fetch(`/api/demo/approvals/${item.approvalId}`).then(response => response.ok ? response.json() as Promise<{ status: string }> : Promise.reject()),
         ]).then(([decision, approval]) => {
-          const status = decision.paymentStatus === "completed" || decision.paymentStatus === "failed" ? decision.paymentStatus : approval.status === "pending" || approval.status === "approved" ? "pending" : approval.status;
+          const status = decision.kind === "swap" ? approval.status : decision.paymentStatus === "completed" || decision.paymentStatus === "failed" ? decision.paymentStatus : approval.status === "pending" || approval.status === "approved" ? "pending" : approval.status;
           if (status !== "pending") setTimeline(current => current.map(entry => entry.decisionId === item.decisionId ? { ...entry, status, data: status === "completed" && decision.merchant?.status === 200 ? decision.merchant.response : undefined, reasons: decision.reasons } : entry));
         }).catch(() => {});
       }
@@ -88,7 +88,7 @@ export function App() {
         append({ kind: "activity", text: `Sending ${scenario.title.toLowerCase()} to Ma'at Gateway.` });
         const { decision } = await request(`/api/demo/scenarios/${scenario.id}/swap`);
         if (decision.quote?.route) append({ kind: "activity", text: `Quoted route: ${decision.quote.route}.` });
-        append({ kind: "decision", label: scenario.title, amountUsd: scenario.swap.amountUsd, verdict: decision.verdict, decidedBy: decision.decidedBy, reasons: decision.reasons, text: decision.analysisOnly ? "Analysis only. No trade was executed." : decision.error || "Swap decision received." });
+        append({ kind: "decision", label: scenario.title, amountUsd: scenario.swap.amountUsd, verdict: decision.verdict, decidedBy: decision.decidedBy, reasons: decision.reasons, decisionId: decision.id, approvalId: decision.approvalId, status: decision.approvalId ? "pending" : undefined, text: decision.analysisOnly ? "Analysis only. No trade was executed." : decision.error || "Swap decision received." });
       }
       append({ kind: "result", text: `${scenario.title}: request finished.` });
     } catch (caught) {

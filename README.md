@@ -54,7 +54,7 @@ maat-gateway/
 5. The `gateway` observer UI polls the decisions and approval status. The user can start World ID from the pending card.
 6. After the Gateway validates the World OIDC callback, it replays the same stored Merchant request and marks the approval as released. The request is bound to the original `intentHash`.
 
-If JEV is unavailable, the Gateway records a `fallback` decision using `JEV_FALLBACK_VERDICT` (default `ESCALATE`). The Debug Panel applies bypass settings on the server. All bypass settings default to `false`; when no setting is changed, the online flow remains JEV evaluation, real payment execution, and World ID approval.
+If JEV is unavailable, the Gateway records a `fallback` decision using the configured JEV result (default `ESCALATE`). The Debug Panel applies bypass settings on the server. All bypass settings default to `false`; the normal payment flow screens the recipient with Intercepta, evaluates with JEV, and requests World ID when the verdict is `ESCALATE`.
 
 `world-demo` is a standalone reference for the World OIDC flow. The new `gateway` project contains its own copy of that server-side flow so its approval lifecycle stays in the Gateway backend. `x402-demo/client` intentionally demonstrates the lower-level wallet flow and does not represent the final Agent-to-Gateway path.
 

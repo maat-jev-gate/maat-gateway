@@ -6,7 +6,7 @@ export type SwapIntent = {
   tokenIn: string;
   tokenOut: string;
   amountUsd: number;
-  source: "owner" | "vendor" | "social";
+  source: "owner" | "merchant" | "social";
   instruction?: string;
 };
 
@@ -53,8 +53,10 @@ export async function screenSwap(input: SwapIntent): Promise<Record<string, unkn
   }
   const intent = result.intent as Record<string, unknown> | undefined;
   if (result.kind !== "swap" || result.analysisOnly !== true || result.agentId !== input.agentId ||
+      typeof result.id !== "string" || !result.id || typeof result.createdAt !== "string" ||
       !["ALLOW", "BLOCK", "ESCALATE"].includes(String(result.verdict)) ||
       !Array.isArray(result.reasons) || !result.reasons.every((reason) => typeof reason === "string") ||
+      !result.timings || typeof result.timings !== "object" || typeof (result.timings as Record<string, unknown>).totalMs !== "number" ||
       typeof intent?.tokenOut !== "string" || intent.tokenOut.toLowerCase() !== input.tokenOut.toLowerCase()) {
     throw new SwapGuardError("Swap Guard returned a mismatched decision.", 502);
   }

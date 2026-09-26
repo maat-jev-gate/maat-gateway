@@ -202,7 +202,7 @@ async function paidResponse(request: FastifyRequest, reply: FastifyReply, produc
 
 app.register(fastifyStatic, { root: join(fileURLToPath(new URL(".", import.meta.url)), "public") });
 
-app.get("/health", async () => ({ ok: true, service: "maat-x402-vendor", network, configured: Boolean(payTo) }));
+app.get("/health", async () => ({ ok: true, service: "maat-x402-merchant", network, configured: Boolean(payTo) }));
 app.get("/api/merchant/events", async () => ({
   events,
   merchants: Object.values(products).map(({ id, merchantName, recipient, priceUsd }) => ({ id, name: merchantName, payTo: recipient, priceUsd })),
@@ -217,7 +217,7 @@ app.delete("/api/merchant/history", async (request, reply) => {
   return { cleared: true };
 });
 
-app.get<{ Params: { id: string } }>("/vendor/atlas/dataset/:id", async (request, reply) => {
+app.get<{ Params: { id: string } }>("/merchant/dataset/:id", async (request, reply) => {
   const product = products.dataset;
   return paidResponse(request, reply, product, {
     id: request.params.id,
@@ -226,12 +226,12 @@ app.get<{ Params: { id: string } }>("/vendor/atlas/dataset/:id", async (request,
   });
 });
 
-app.post("/vendor/atlas/verify-account", async (request, reply) => {
+app.post("/merchant/verify-account", async (request, reply) => {
   const product = products.verifyAccount;
   return paidResponse(request, reply, product, { status: "verified", account: "atlas-demo-account" });
 });
 
-app.get("/vendor/atlas/risk-check", async (request, reply) => {
+app.get("/merchant/risk-check", async (request, reply) => {
   if (!riskPayTo) return reply.code(503).send({ error: "MERCHANT_RISK_PAY_TO is not configured." });
   return paidResponse(request, reply, products.riskCheck, { id: "risk-check", title: "Atlas dataset", rows: [] });
 });
@@ -247,4 +247,4 @@ app.setNotFoundHandler((request, reply) => {
 });
 
 await app.listen({ port, host: "127.0.0.1" });
-console.log(`x402 vendor listening on http://localhost:${port}`);
+console.log(`x402 merchant listening on http://localhost:${port}`);

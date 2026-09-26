@@ -31,6 +31,9 @@ test("screens the recipient and the Base mainnet USDC proxy before allowing paym
   const risk = await checkPaymentRisk(requirements);
   assert.equal(risk.status, "clear");
   assert.equal(risk.scans.length, 2);
+  assert.deepEqual(risk.scans.map((scan) => scan.request.method), ["GET", "GET"]);
+  assert.deepEqual(risk.scans.map((scan) => scan.response), [{ toxicScore: 0, traits: [] }, { action: "allow", riskLevel: "low", category: "legitimate" }]);
+  assert.ok(risk.scans.every((scan) => !JSON.stringify(scan.request).includes("test-key")));
   assert.match(urls[0], /account\/0x1111111111111111111111111111111111111111\/quick-scan/);
   assert.match(urls[1], /token\/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913\/risks\?chainId=8453/);
 });

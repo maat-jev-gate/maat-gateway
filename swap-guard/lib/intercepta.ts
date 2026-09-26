@@ -61,7 +61,7 @@ export async function quickScanAddress(address: string, raw: unknown[]): Promise
   const path = `/api/public/v2/extension/account/${address.toLowerCase()}/quick-scan`;
   try {
     const { body, cached } = await get<QuickScan>(path);
-    raw.push({ endpoint: "quick-scan", address, cached, response: body });
+    raw.push({ request: { method: "GET", path }, cached, response: body });
     return {
       address,
       tier: addressTier(body),
@@ -71,7 +71,7 @@ export async function quickScanAddress(address: string, raw: unknown[]): Promise
       cached,
     };
   } catch (caught) {
-    raw.push({ endpoint: "quick-scan", address, error: errorMessage(caught) });
+    raw.push({ request: { method: "GET", path }, error: errorMessage(caught) });
     return { address, tier: "unknown", toxicScore: null, traits: [], ms: Math.round(performance.now() - startedAt), cached: false, error: errorMessage(caught) };
   }
 }
@@ -82,7 +82,7 @@ export async function scanToken(address: string, raw: unknown[]): Promise<Interc
   const path = `/api/public/v2/extension/token-intelligence/token/${address.toLowerCase()}/risks?chainId=1`;
   try {
     const { body, cached } = await get<TokenRisks>(path);
-    raw.push({ endpoint: "scan-token", address, cached, response: body });
+    raw.push({ request: { method: "GET", path }, cached, response: body });
     return {
       tier: tokenTier(body),
       riskScore: body.riskScore,
@@ -97,7 +97,7 @@ export async function scanToken(address: string, raw: unknown[]): Promise<Interc
       cached,
     };
   } catch (caught) {
-    raw.push({ endpoint: "scan-token", address, error: errorMessage(caught) });
+    raw.push({ request: { method: "GET", path }, error: errorMessage(caught) });
     return { tier: "unknown", riskScore: null, detectors: [], ms: Math.round(performance.now() - startedAt), cached: false, error: errorMessage(caught) };
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const merchantPath = "/vendor/atlas/dataset/demo-1";
+const merchantPath = "/merchant/dataset/demo-1";
 const chainId = "0x14a34";
 const chainName = "Base Sepolia";
 

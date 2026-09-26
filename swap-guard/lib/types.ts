@@ -7,7 +7,7 @@ export type Verdict = "ALLOW" | "BLOCK" | "ESCALATE";
 export type Rule = "H1" | "H2" | "H3" | "H4" | "H5" | "C";
 export type SignalSource = "intercepta" | "uniswap" | "chain" | "policy" | "intent";
 export type Tier = "high" | "medium" | "low" | "unknown";
-export type InstructionSource = "owner" | "vendor" | "social";
+export type InstructionSource = "owner" | "merchant" | "social";
 
 export type Signal = {
   key: string;
@@ -176,7 +176,7 @@ export type Decision = {
   intent: SwapIntent;
   policy: Policy;
   timings: { totalMs: number; interceptaMs?: number; uniswapMs?: number; forensicsMs?: number; jevMs?: number };
-  raw: { intercepta?: unknown[]; uniswapQuote?: unknown; jev?: unknown };
+  raw: { intercepta?: unknown[]; uniswapQuote?: unknown; jevRequest?: unknown; jev?: unknown };
   /** Mainnet swaps are analysed only; nothing is signed or broadcast. */
   analysisOnly: true;
   stages: Stage[];

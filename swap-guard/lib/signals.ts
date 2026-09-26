@@ -33,7 +33,7 @@ export function buildSignals(input: {
   if (input.source === "owner") {
     signals.push({ key: "source", label: "Instruction came from the owner", value: "Owner instruction", weight: -0.3, source: "intent" });
   } else {
-    signals.push({ key: "source", label: `Instruction came from an untrusted ${input.source === "social" ? "social post" : "vendor message"}`, value: input.source, weight: 0.6, source: "intent" });
+    signals.push({ key: "source", label: `Instruction came from an untrusted ${input.source === "social" ? "social post" : "merchant message"}`, value: input.source, weight: 0.6, source: "intent" });
   }
 
   // Uniswap quote.

@@ -31,7 +31,7 @@ const PRESETS = [
 
 const SOURCES: { value: InstructionSource; label: string }[] = [
   { value: "social", label: "Social post" },
-  { value: "vendor", label: "Vendor message" },
+  { value: "merchant", label: "Merchant message" },
   { value: "owner", label: "Owner" },
 ];
 
@@ -80,7 +80,8 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
+    const stateTimer = setInterval(() => void refresh(), 2_000);
     const loadChain = () =>
       fetch("/api/chain", { cache: "no-store" })
         .then((response) => (response.ok ? response.json() : null))
@@ -88,7 +89,7 @@ export function Dashboard() {
         .catch(() => undefined);
     loadChain();
     const timer = setInterval(loadChain, 12_000);
-    return () => clearInterval(timer);
+    return () => { clearInterval(stateTimer); clearInterval(timer); };
   }, [refresh]);
 
   useEffect(() => {

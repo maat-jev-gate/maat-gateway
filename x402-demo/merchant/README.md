@@ -25,13 +25,13 @@ The service hosts three mock Merchant profiles, each with its own x402 resource 
 
 | Mock Merchant | Resource | Price | Recipient |
 | --- | --- | --- | --- |
-| Dataset seller | `GET /vendor/atlas/dataset/:id` | $0.001 USDC | `MERCHANT_PAY_TO` |
-| Verification service | `POST /vendor/atlas/verify-account` | $80.00 USDC | `MERCHANT_VERIFY_PAY_TO`, falling back to `MERCHANT_PAY_TO` |
-| Risk recipient | `GET /vendor/atlas/risk-check` | $0.001 USDC | `MERCHANT_RISK_PAY_TO`; returns HTTP 503 until configured |
+| Dataset seller | `GET /merchant/dataset/:id` | $0.001 USDC | `MERCHANT_PAY_TO` |
+| Verification service | `POST /merchant/verify-account` | $80.00 USDC | `MERCHANT_VERIFY_PAY_TO`, falling back to `MERCHANT_PAY_TO` |
+| Risk recipient | `GET /merchant/risk-check` | $0.001 USDC | `MERCHANT_RISK_PAY_TO`; returns HTTP 503 until configured |
 
 - `GET /health` reports configuration without exposing secrets.
 
-Without a `PAYMENT-SIGNATURE` header, configured vendor endpoints return HTTP `402` with a base64 encoded `PAYMENT-REQUIRED` header. When the header is present, the service decodes the x402 payload, calls the facilitator `/verify` and `/settle` endpoints, and only then returns data.
+Without a `PAYMENT-SIGNATURE` header, configured merchant endpoints return HTTP `402` with a base64 encoded `PAYMENT-REQUIRED` header. When the header is present, the service decodes the x402 payload, calls the facilitator `/verify` and `/settle` endpoints, and only then returns data.
 
 `DEMO_ALLOW_UNSIGNED_PAYMENT=true` is available for local route wiring only. It returns a response marked `payment.demo=true` and does not create a transaction. Keep it `false` for the real Maat demo.
 

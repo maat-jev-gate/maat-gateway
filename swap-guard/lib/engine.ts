@@ -29,7 +29,7 @@ function validate(input: SwapRequest) {
   const amountIn = input.amountIn ? Number(input.amountIn) : NaN;
   const amountUsd = input.amountUsd !== undefined ? Number(input.amountUsd) : NaN;
   if (!(amountIn > 0) && !(amountUsd > 0)) throw new RequestError("Provide amountIn (ETH) or amountUsd greater than zero.");
-  if (!["owner", "vendor", "social"].includes(input.source)) throw new RequestError("source must be owner, vendor, or social.");
+  if (!["owner", "merchant", "social"].includes(input.source)) throw new RequestError("source must be owner, merchant, or social.");
 }
 
 export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent) => void = () => {}): Promise<Decision> {
@@ -170,6 +170,7 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
   // J / C / F.
   let jev: JevResult | undefined;
   let jevRaw: unknown;
+  const jevTrace: { request?: unknown } = {};
   let jevError: string | undefined;
   let fallbackNet: number | undefined;
   if (verdict) {
@@ -179,7 +180,7 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
     stage("jev", "start");
     if (config.jevKey()) {
       try {
-        const answer = await askJev(jevState({ input, agentId, amountUsd, amountEth, token: token!, quote, tokenScan, forensics, signals, spentBeforeUsd }));
+        const answer = await askJev(jevState({ input, agentId, amountUsd, amountEth, token: token!, quote, tokenScan, forensics, signals, spentBeforeUsd }), jevTrace);
         jev = answer.result;
         jevRaw = answer.raw;
         timings.jevMs = jev.latencyMs;
@@ -237,7 +238,7 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
     },
     policy,
     timings,
-    raw: { intercepta: rawIntercepta, uniswapQuote: quoteRaw, jev: jevRaw },
+    raw: { intercepta: rawIntercepta, uniswapQuote: quoteRaw, jevRequest: jevTrace.request, jev: jevRaw },
     analysisOnly: true,
     stages: [],
     token,

@@ -9,7 +9,7 @@ const cache = new Map<string, { expiresAt: number; response: unknown }>();
 export type RiskCheck = {
   status: "clear" | "blocked" | "unavailable";
   reasons: string[];
-  scans: { kind: "address" | "token"; address: string; chainId?: number; cached: boolean; response: unknown }[];
+  scans: { kind: "address" | "token"; address: string; chainId?: number; cached: boolean; request: { method: "GET"; path: string }; response: unknown }[];
   ms: number;
 };
 
@@ -70,8 +70,9 @@ export async function checkPaymentRisk(requirements: Requirements, signal?: Abor
     const chainId = Number(requirements.network.match(/^eip155:(\d+)$/)?.[1]);
     if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Invalid x402 network for Intercepta screening.");
     const address = requirements.payTo.toLowerCase();
-    const addressScan = await get(`/api/public/v2/extension/account/${address}/quick-scan`, signal);
-    scans.push({ kind: "address", address, ...addressScan });
+    const addressPath = `/api/public/v2/extension/account/${address}/quick-scan`;
+    const addressScan = await get(addressPath, signal);
+    scans.push({ kind: "address", address, request: { method: "GET", path: addressPath }, ...addressScan });
     const addressFlag = addressRisk(addressScan.response);
     if (addressFlag) reasons.push(addressFlag);
 
@@ -79,8 +80,9 @@ export async function checkPaymentRisk(requirements: Requirements, signal?: Abor
       ? { address: BASE_MAINNET_USDC.toLowerCase(), chainId: 8453 }
       : [1, 8453].includes(chainId) ? { address: requirements.asset.toLowerCase(), chainId } : undefined;
     if (token) {
-      const tokenScan = await get(`/api/public/v2/extension/token-intelligence/token/${token.address}/risks?chainId=${token.chainId}`, signal);
-      scans.push({ kind: "token", ...token, ...tokenScan });
+      const tokenPath = `/api/public/v2/extension/token-intelligence/token/${token.address}/risks?chainId=${token.chainId}`;
+      const tokenScan = await get(tokenPath, signal);
+      scans.push({ kind: "token", ...token, request: { method: "GET", path: tokenPath }, ...tokenScan });
       const tokenFlag = tokenRisk(tokenScan.response);
       if (tokenFlag) reasons.push(tokenFlag);
     }

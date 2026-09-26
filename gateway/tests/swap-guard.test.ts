@@ -16,11 +16,13 @@ const input: SwapIntent = {
 };
 const decision = {
   id: "decision-id",
+  createdAt: "2026-09-26T00:00:00.000Z",
   kind: "swap",
   agentId: input.agentId,
   verdict: "ESCALATE",
   reasons: ["Owner review required."],
   analysisOnly: true,
+  timings: { totalMs: 12 },
   intent: { tokenOut: input.tokenOut },
   quote: { route: "ETH to USDC" },
 };
