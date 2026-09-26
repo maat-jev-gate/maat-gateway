@@ -108,8 +108,7 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 
 | Variable | Purpose |
 | --- | --- |
-| `GATEWAY_BASIC_USER` / `GATEWAY_BASIC_PASSWORD` | Credentials required by Agent requests and the Gateway console demo buttons |
-| `VITE_MAAT_GATEWAY_BASIC_USER` / `VITE_MAAT_GATEWAY_BASIC_PASSWORD` | Same credentials exposed to the Gateway console build so its buttons can call the demo route |
+| `GATEWAY_BASIC_USER` / `GATEWAY_BASIC_PASSWORD` | Server-side credentials required by Agent requests and authenticated Gateway console actions |
 | `MAAT_TREASURY_PRIVATE_KEY` | Server-only 32-byte hex private key used to sign x402 payments |
 | `JEV_API_URL` / `JEV_API_KEY` / `JEV_MODEL` | Direct TypeSafe JEV connection used by the Gateway |
 | `WORLD_ISSUER` | World Sandbox issuer, normally `https://sandbox.auth.world.org` |
@@ -122,7 +121,7 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 
 The Agent supplies `purpose` on every payment request. The Gateway console keeps Demo purpose in the Demo Requests row, while server Settings contain only the Merchant URL and runtime controls. Agent purposes can differ by task and step; the Agent demo combines the user task with each step purpose before calling the Gateway.
 
-The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. `Apply settings` sends the complete configuration to `POST /api/maat/settings`; the server returns the authoritative configuration and the UI replaces its local copy with that response. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
+The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. Authenticated console actions prompt the operator for Gateway credentials and keep them only in page memory. `Apply settings` sends the complete configuration to `POST /api/maat/settings`; the server returns the authoritative configuration and the UI replaces its local copy with that response. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
 
 The three buttons under **DEMO REQUESTS** call authenticated `POST /api/maat/demo`. This route is isolated from the external Agent contract and always runs as a dry run. It accepts `allow`, `block`, or `escalate` to rehearse the three UI states without depending on JEV output. External Agents use `POST /api/maat/pay`, where verdicts come from JEV or the current Gateway settings.
 

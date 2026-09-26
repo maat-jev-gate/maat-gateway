@@ -1,5 +1,5 @@
 /*
- * File description: Build and publish the static Maat Agent demo over SSH with rsync and Caddy.
+ * File description: Build and publish the Maat Agent demo service over SSH with PM2 and Caddy.
  */
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -34,13 +34,18 @@ async function main() {
   const host = env.DEPLOY_HOST;
   const domain = env.DEPLOY_DOMAIN;
   const appDir = env.REMOTE_APP_DIR || "/opt/maat-agent-demo";
+  const port = Number(env.PORT ?? 8794);
   if (!host) throw new Error("Missing DEPLOY_HOST in .env.");
   if (!/^[a-z0-9][a-z0-9._@-]*$/i.test(host)) throw new Error("DEPLOY_HOST must be an SSH host or user@host.");
   if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error("DEPLOY_DOMAIN must be a hostname.");
   if (!/^\/[a-zA-Z0-9/_-]+$/.test(appDir)) throw new Error("REMOTE_APP_DIR must be an absolute path without shell characters.");
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("PORT must be a valid user-space port.");
+  for (const name of ["AGENT_SITE_BASIC_USER", "AGENT_SITE_BASIC_PASSWORD", "GATEWAY_BASIC_USER", "GATEWAY_BASIC_PASSWORD"]) {
+    if (!env[name]) throw new Error(`Missing ${name} in .env.`);
+  }
   const caddyConfig = await readFile(caddyFile, "utf8");
   if (!caddyConfig.trimStart().startsWith(`${domain} {`)) throw new Error("deploy/caddy/site.caddy must use DEPLOY_DOMAIN as its site address.");
-  if (!caddyConfig.includes(`root * ${appDir}/dist`)) throw new Error("deploy/caddy/site.caddy must serve REMOTE_APP_DIR/dist.");
+  if (!caddyConfig.includes(`reverse_proxy 127.0.0.1:${port}`)) throw new Error("deploy/caddy/site.caddy must proxy to PORT.");
   if (args.has("--validate")) {
     await command("npm", ["run", "typecheck"]);
     await command("npm", ["run", "build"]);
@@ -55,16 +60,32 @@ set -eu
 APP_DIR='${appDir}'
 DOMAIN='${domain}'
 BACKUP_DIR="$APP_DIR/.deploy-backups/$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$APP_DIR/dist" "$BACKUP_DIR" /etc/caddy/backups
+mkdir -p "$APP_DIR/dist" "$APP_DIR/src" "$BACKUP_DIR" /etc/caddy/backups
 if [ -f /etc/caddy/sites/$DOMAIN.caddy ]; then cp /etc/caddy/sites/$DOMAIN.caddy "$BACKUP_DIR/$DOMAIN.caddy"; fi
 `);
   await command("rsync", ["-az", "--delete", `${join(root, "dist")}/`, `${host}:${appDir}/dist/`]);
+  await command("rsync", ["-az", "server.ts", "package.json", "package-lock.json", "ecosystem.config.cjs", `${host}:${appDir}/`]);
+  await command("rsync", ["-az", "src/steps.ts", `${host}:${appDir}/src/`]);
+  await command("rsync", ["-az", ".env", `${host}:${appDir}/.env`]);
   await command("rsync", ["-az", caddyFile, `${host}:/etc/caddy/sites/${domain}.caddy`]);
   await ssh(`
 set -eu
+cd '${appDir}'
+chmod 600 .env
+npm ci --omit=dev
+pm2 startOrReload ecosystem.config.cjs --update-env
+pm2 save
+ready=0
+for attempt in $(seq 1 30); do
+  if curl -fsS http://127.0.0.1:${port}/health >/dev/null; then ready=1; break; fi
+  sleep 1
+done
+if [ "$ready" -ne 1 ]; then
+  pm2 logs maat-agent-demo --lines 40 --nostream >&2 || true
+  exit 1
+fi
 caddy validate --config /etc/caddy/Caddyfile
 systemctl reload caddy
-curl -fsS -H 'Host: ${domain}' http://127.0.0.1/ >/dev/null
 echo 'remote Agent site is ready'
 `);
   console.log(`Published https://${domain}`);

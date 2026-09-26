@@ -1,12 +1,12 @@
 # Maat Agent Demo
 
-This demo runs a fixed four-step payment story in a full-screen agent view. Each step calls a user-supplied Maat gateway URL with the contract from the project plan:
+This demo runs a fixed four-step payment story in a full-screen agent view. The Agent service sends each payment intent to the configured Maat Gateway:
 
 ```json
 { "agentId": "maat-demo-agent", "url": "...", "method": "GET", "purpose": "...", "taskId": "demo-fixed-payment-run" }
 ```
 
-The browser calls `VITE_MAAT_GATEWAY_URL` (defaulting to `https://gateway.maat-jev-gate.online/api/maat/pay`) and adds HTTP Basic authentication from `VITE_MAAT_GATEWAY_BASIC_USER` and `VITE_MAAT_GATEWAY_BASIC_PASSWORD`. This is intentionally a local demo: Vite exposes `VITE_` variables to the browser, so do not use a production credential here. The demo does not call OpenAI and does not contain a wallet key.
+The browser calls only the Agent service's same-origin `/api/demo/*` routes. The service keeps `GATEWAY_BASIC_USER` and `GATEWAY_BASIC_PASSWORD` in its server-side `.env`, calls `GATEWAY_URL`, and forwards Gateway decisions. `AGENT_SITE_BASIC_USER` and `AGENT_SITE_BASIC_PASSWORD` protect the site and its API with separate credentials. The four Merchant endpoints are fixed in `src/steps.ts`; browser requests cannot choose a payment URL. The demo does not call OpenAI and does not contain a wallet key.
 
 ## Run
 
@@ -16,7 +16,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:5175` for local development. The published Agent UI is `https://agent.maat-jev-gate.online`. The browser calls the Gateway directly, so the Gateway must allow CORS requests from both the local Vite origin and the published Agent origin.
+Open `http://localhost:5175` for local development. Vite proxies `/api` to the Agent service on port `8794`. The published Agent UI is `https://agent.maat-jev-gate.online`. Sign in with the Agent site credentials from `.env`; they are distinct from the Gateway credentials.
 
 ## Publish
 
@@ -27,4 +27,4 @@ npm run deploy:validate
 npm run deploy
 ```
 
-The deploy script builds the static Vite output, syncs it and `deploy/caddy/site.caddy` with `rsync`, validates and reloads Caddy, then checks the site on the remote machine. The production site is served directly by Caddy; no Node process or PM2 service is needed for this static Agent UI.
+The deploy script builds the Vite output, syncs the Agent service and its server-only `.env`, installs production dependencies, starts it with PM2, then updates Caddy to proxy the public domain to port `8794`. `npm start` serves the built site and API directly without Caddy when another HTTPS ingress is used.

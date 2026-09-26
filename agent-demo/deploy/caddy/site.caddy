@@ -1,6 +1,4 @@
 agent.maat-jev-gate.online {
 	encode zstd gzip
-	root * /opt/maat-agent-demo/dist
-	try_files {path} /index.html
-	file_server
+	reverse_proxy 127.0.0.1:8794
 }

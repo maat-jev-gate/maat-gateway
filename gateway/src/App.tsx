@@ -5,7 +5,16 @@ type Decision = { id: string; createdAt: string; agentId: string; taskId: string
 type Approval = { id: string; status: "pending" | "approved" | "rejected" | "expired"; expiresAt: string; releasedResponse?: unknown };
 
 const emptySettings: Settings = { bypassJev: false, bypassRealPayment: false, bypassWorldId: false, bypassMerchantRequest: false, jevBypassVerdict: "ESCALATE", worldBypassVerdict: "ALLOW", merchantUrl: "https://merchant.maat-jev-gate.online/vendor/atlas/dataset/demo-1" };
-const gatewayCredentials = `Basic ${btoa(`${import.meta.env.VITE_MAAT_GATEWAY_BASIC_USER ?? ""}:${import.meta.env.VITE_MAAT_GATEWAY_BASIC_PASSWORD ?? ""}`)}`;
+let gatewayCredentials = "";
+function gatewayAuth() {
+  if (gatewayCredentials) return gatewayCredentials;
+  const user = window.prompt("Gateway username", "demo-agent");
+  if (user === null) throw new Error("Gateway authentication was cancelled.");
+  const password = window.prompt("Gateway password");
+  if (password === null) throw new Error("Gateway authentication was cancelled.");
+  gatewayCredentials = `Basic ${btoa(`${user}:${password}`)}`;
+  return gatewayCredentials;
+}
 
 export function App() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -39,16 +48,20 @@ export function App() {
 
   async function applySettings() {
     setError(""); setNotice("");
-    const response = await fetch("/api/maat/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
-    if (!response.ok) { setError("Gateway settings could not be applied."); return; }
-    const current = await response.json() as Settings;
-    setSettings(current); setDraft(current); setNotice("Settings applied on the Gateway server.");
+    try {
+      const response = await fetch("/api/maat/settings", { method: "POST", headers: { Authorization: gatewayAuth(), "Content-Type": "application/json" }, body: JSON.stringify(draft) });
+      if (response.status === 401) gatewayCredentials = "";
+      if (!response.ok) throw new Error("Gateway settings could not be applied.");
+      const current = await response.json() as Settings;
+      setSettings(current); setDraft(current); setNotice("Settings applied on the Gateway server.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Gateway settings could not be applied."); }
   }
 
   async function runDemo(scenario: "allow" | "block" | "escalate") {
     setRunning(true); setError(""); setNotice("");
     try {
-      const response = await fetch("/api/maat/demo", { method: "POST", headers: { "Authorization": gatewayCredentials, "Content-Type": "application/json" }, body: JSON.stringify({ scenario, purpose: demoPurpose }) });
+      const response = await fetch("/api/maat/demo", { method: "POST", headers: { Authorization: gatewayAuth(), "Content-Type": "application/json" }, body: JSON.stringify({ scenario, purpose: demoPurpose }) });
+      if (response.status === 401) gatewayCredentials = "";
       if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Demo Merchant request failed.");
       await refresh();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Demo request failed."); }
@@ -57,9 +70,12 @@ export function App() {
 
   async function resolveApproval(approvalId: string) {
     if (settings.bypassWorldId) {
-      const response = await fetch(`/api/maat/approvals/${approvalId}/resolve`, { method: "POST", headers: { Authorization: gatewayCredentials } });
-      if (!response.ok) { setError((await response.json() as { error?: string }).error ?? "Approval could not be resolved."); return; }
-      await refresh();
+      try {
+        const response = await fetch(`/api/maat/approvals/${approvalId}/resolve`, { method: "POST", headers: { Authorization: gatewayAuth() } });
+        if (response.status === 401) gatewayCredentials = "";
+        if (!response.ok) throw new Error((await response.json() as { error?: string }).error ?? "Approval could not be resolved.");
+        await refresh();
+      } catch (caught) { setError(caught instanceof Error ? caught.message : "Approval could not be resolved."); }
       return;
     }
     const popup = window.open(`/api/maat/approvals/${approvalId}/world/start`, "maat-world-approval", "popup,width=480,height=760");
