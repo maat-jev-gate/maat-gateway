@@ -63,8 +63,6 @@ h1 em{color:var(--gold);font-style:normal}
 .scenario-heading b{font:700 13px Manrope,system-ui,sans-serif}
 .scenario-heading button{padding:2px 0;border:0;background:none;color:var(--muted);font-size:11px}
 .scenario-heading button:disabled{opacity:.5;cursor:default}
-.scenario-recipient{display:flex;gap:8px;padding:5px 14px 0;color:var(--muted);font:10px 'DM Mono'}
-.scenario-recipient span{flex:none}.scenario-recipient code{overflow-wrap:anywhere;color:var(--red)}
 .scenario-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:9px 14px 12px}
 .scenario-button{min-width:0;height:60px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;padding:9px 12px;border:1px solid var(--line);border-radius:5px;background:#fffdf8;color:#28352f}
 .scenario-button:hover:not(:disabled),.scenario-button:focus-visible{border-color:#b58d4c;background:#f8f0dd;outline:none}
@@ -86,7 +84,6 @@ footer{flex:none;display:flex;justify-content:space-between;gap:10px;padding:0 1
   .chat{min-height:180px;padding:10px}
   .bubble{max-width:95%}
   .scenario-heading{padding:8px 10px 0}
-  .scenario-recipient{padding:5px 10px 0}
   .scenario-list{gap:6px;padding:8px 10px 10px}
   .scenario-button{height:74px;gap:5px;padding:8px}
   .scenario-button b{font-size:11px}

@@ -142,7 +142,7 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 
 The Agent supplies `purpose` on every payment request. The Gateway console keeps Demo purpose in the Demo Requests row, while server Settings contain only the Merchant URL and runtime controls. Agent purposes can differ by task and step; the Agent demo combines the user task with each step purpose before calling the Gateway.
 
-Agents may also send `payTo` as their intended recipient. The Gateway blocks the request when it differs from the Merchant's `payTo` in the x402 quote. The risk-recipient Agent scene supplies this field from its server-only environment; the Merchant quotes the same address from its own environment.
+The Merchant's x402 quote supplies the payment recipient. The Gateway screens that address with Intercepta and uses it to sign the payment. External Agents may also send `payTo` as an expected recipient; the Gateway blocks a mismatch with the quote.
 
 The Debug Panel edits Merchant URL, the four bypass controls in call order (Merchant request, JEV, World ID, real payment), the JEV result used for bypasses and JEV failures, the World ID bypass result, and the Demo purpose locally. `Apply settings` sends the complete configuration to `POST /api/maat/settings`; the server returns the authoritative configuration and the UI replaces its local copy with that response. Console actions do not prompt for credentials. The JEV result defaults to `ESCALATE`. When World ID bypass is enabled, an Escalate card still requires a user click; that click applies Auto approve or Auto reject without calling World ID. Real payment runs only after an approval is accepted.
 
