@@ -11,6 +11,12 @@ cp .env.example .env
 npm run dev
 ```
 
+The production merchant console and API are available at `https://merchant.maat-jev-gate.online`. The deployment script reads `DEPLOY_HOST` and `DEPLOY_DOMAIN` from the ignored `.env`, then syncs the service with `rsync` and updates PM2 and Caddy:
+
+```bash
+npm run deploy
+```
+
 The public `https://x402.org/facilitator` test service does not require an OAuth token. Leave `FACILITATOR_AUTH_TOKEN` empty. That variable is only for a private facilitator that explicitly gives you a Bearer API token; it is not a MetaMask credential and there is no token to create for this demo.
 
 Endpoints:

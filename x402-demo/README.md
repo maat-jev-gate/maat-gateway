@@ -17,6 +17,8 @@ npm run dev
 
 Open the merchant console at `http://localhost:8790`.
 
+The deployed merchant console is at `https://merchant.maat-jev-gate.online`.
+
 ## Start the demo client
 
 ```bash
