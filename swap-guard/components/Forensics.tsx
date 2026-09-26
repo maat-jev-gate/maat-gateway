@@ -30,8 +30,12 @@ function nodeFacts(node: TrailNode, forensics: Forensics) {
         : `Intercepta toxicScore ${node.intercepta.toxicScore}${node.intercepta.traits.length ? ` · ${node.intercepta.traits.map((trait) => trait.name).join(", ")}` : ""}`,
     );
   }
-  if (node.label?.txCount !== undefined) facts.push(`${node.label.txCount.toLocaleString("en-US")} outgoing txs`);
-  if (node.role === "deployer" && forensics.deployerFirstSeen !== null) facts.push(`first tx ${duration(forensics.createdAt - forensics.deployerFirstSeen)} before launch`);
+  if (node.label?.txCount !== undefined)
+    facts.push(`${node.label.txCount.toLocaleString("en-US")} outgoing txs`);
+  if (node.role === "deployer" && forensics.deployerFirstSeen !== null)
+    facts.push(
+      `first tx ${duration(forensics.createdAt - forensics.deployerFirstSeen)} before launch`,
+    );
   if (node.role === "token") facts.push(`${duration(forensics.ageSec)} old`);
   if (node.note) facts.push(node.note);
   return facts.join(" · ") || (node.label ? "No labels" : "Blockscout label unavailable");
@@ -46,7 +50,8 @@ function edgeText(from: TrailNode, to: TrailNode | undefined, forensics: Forensi
       </>
     );
   }
-  if (from.role === "deployer" && to?.role === "factory") return "Signed the creation call; the factory is the on-chain creator, so the signer is followed.";
+  if (from.role === "deployer" && to?.role === "factory")
+    return "Signed the creation call; the factory is the on-chain creator, so the signer is followed.";
   if ((from.role === "deployer" || from.role === "factory") && to?.role === "token") {
     return (
       <>
@@ -62,8 +67,14 @@ export function Trail({ forensics }: { forensics: Forensics }) {
   const nodes = forensics.fundingPath;
   return (
     <section className="card" aria-labelledby="trail-title">
-      <CardHead id="trail-title" title="Follow the money" sub="The deployer's first incoming ETH, traced back up to two hops, then down to the token." />
-      {forensics.fundingError ? <p className="empty-note">{`Funding trace failed: ${forensics.fundingError}`}</p> : null}
+      <CardHead
+        id="trail-title"
+        title="Follow the money"
+        sub="The deployer's first incoming ETH, traced back up to two hops, then down to the token."
+      />
+      {forensics.fundingError ? (
+        <p className="empty-note">{`Funding trace failed: ${forensics.fundingError}`}</p>
+      ) : null}
       <div className="trail">
         {nodes.map((node, index) => {
           const tier = nodeTier(node);
@@ -75,7 +86,13 @@ export function Trail({ forensics }: { forensics: Forensics }) {
                 <div>
                   <div className="trail-top">
                     <span className="trail-role">{ROLE_TEXT[node.role]}</span>
-                    <span className="trail-risk">{tier === "none" ? (node.intercepta ? TIER_TEXT.unknown : "Not scanned") : TIER_TEXT[tier]}</span>
+                    <span className="trail-risk">
+                      {tier === "none"
+                        ? node.intercepta
+                          ? TIER_TEXT.unknown
+                          : "Not scanned"
+                        : TIER_TEXT[tier]}
+                    </span>
                   </div>
                   <div className="trail-name">
                     <Ext href={addressUrl(node.address)}>
@@ -105,7 +122,11 @@ export function Record({ forensics }: { forensics: Forensics }) {
   const dumped = rows.filter((row) => row.devSold);
   return (
     <section className="card" aria-labelledby="record-title">
-      <CardHead id="record-title" title="Deployer track record" sub={<span className="mono">{forensics.deployer}</span>} />
+      <CardHead
+        id="record-title"
+        title="Deployer track record"
+        sub={<span className="mono">{forensics.deployer}</span>}
+      />
       {forensics.historyError ? (
         <p className="empty-note">{`History lookup failed: ${forensics.historyError}`}</p>
       ) : rows.length ? (
@@ -144,11 +165,25 @@ export function Record({ forensics }: { forensics: Forensics }) {
                       </span>
                     </td>
                     <td>
-                      <Ext href={txUrl(row.launchTx)}>{`${duration(Math.max(0, Date.now() / 1000 - row.launchedAt))} ago`}</Ext>
+                      <Ext
+                        href={txUrl(row.launchTx)}
+                      >{`${duration(Math.max(0, Date.now() / 1000 - row.launchedAt))} ago`}</Ext>
                     </td>
-                    <td className="r">{row.error ? "lookup failed" : row.movedOutPct === null ? "never held" : `${row.movedOutPct.toFixed(0)}%`}</td>
-                    <td className="r">{row.movedOutWithin24hPct === null ? "—" : `${row.movedOutWithin24hPct.toFixed(0)}%`}</td>
-                    <td className="r">{row.firstOutAfterSec === null ? "—" : `+${duration(row.firstOutAfterSec)}`}</td>
+                    <td className="r">
+                      {row.error
+                        ? "lookup failed"
+                        : row.movedOutPct === null
+                          ? "never held"
+                          : `${row.movedOutPct.toFixed(0)}%`}
+                    </td>
+                    <td className="r">
+                      {row.movedOutWithin24hPct === null
+                        ? "—"
+                        : `${row.movedOutWithin24hPct.toFixed(0)}%`}
+                    </td>
+                    <td className="r">
+                      {row.firstOutAfterSec === null ? "—" : `+${duration(row.firstOutAfterSec)}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

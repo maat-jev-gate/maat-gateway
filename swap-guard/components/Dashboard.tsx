@@ -12,7 +12,23 @@ import { Record, Trail } from "./Forensics";
 import { JevCard, RawEvidence, RuleTrace } from "./Judgement";
 import { Scale } from "./Scale";
 import { Timeline } from "./Timeline";
-import { CardHead, Ext, Glyph, Icon, VERDICTS, VERDICT_META, VerdictChip, addressUrl, amount, clock, duration, ms, pct, short, usd } from "./ui";
+import {
+  CardHead,
+  Ext,
+  Glyph,
+  Icon,
+  VERDICTS,
+  VERDICT_META,
+  VerdictChip,
+  addressUrl,
+  amount,
+  clock,
+  duration,
+  ms,
+  pct,
+  short,
+  usd,
+} from "./ui";
 
 type AppState = {
   policy: Policy;
@@ -89,7 +105,10 @@ export function Dashboard() {
         .catch(() => undefined);
     loadChain();
     const timer = setInterval(loadChain, 12_000);
-    return () => { clearInterval(stateTimer); clearInterval(timer); };
+    return () => {
+      clearInterval(stateTimer);
+      clearInterval(timer);
+    };
   }, [refresh]);
 
   useEffect(() => {
@@ -131,10 +150,30 @@ export function Dashboard() {
       if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
       await readStream(response, (streamEvent) => {
         if (streamEvent.type === "stage") {
-          setRun((current) => (current ? { ...current, stages: [...current.stages.filter((stage) => stage.key !== streamEvent.stage.key), streamEvent.stage] } : current));
+          setRun((current) =>
+            current
+              ? {
+                  ...current,
+                  stages: [
+                    ...current.stages.filter((stage) => stage.key !== streamEvent.stage.key),
+                    streamEvent.stage,
+                  ],
+                }
+              : current,
+          );
         } else if (streamEvent.type === "decision") {
           setSelectedId(streamEvent.decision.id);
-          setApp((current) => (current ? { ...current, decisions: [streamEvent.decision, ...current.decisions.filter((d) => d.id !== streamEvent.decision.id)] } : current));
+          setApp((current) =>
+            current
+              ? {
+                  ...current,
+                  decisions: [
+                    streamEvent.decision,
+                    ...current.decisions.filter((d) => d.id !== streamEvent.decision.id),
+                  ],
+                }
+              : current,
+          );
         } else {
           setError(streamEvent.message);
         }
@@ -168,7 +207,9 @@ export function Dashboard() {
           </span>
           <span className="chip">
             <span className="chip-k">Block</span>
-            <span className="num">{chain ? `#${Number(chain.blockNumber).toLocaleString("en-US")}` : "…"}</span>
+            <span className="num">
+              {chain ? `#${Number(chain.blockNumber).toLocaleString("en-US")}` : "…"}
+            </span>
           </span>
           <span className="chip">
             <span className="chip-k">ETH</span>
@@ -184,15 +225,34 @@ export function Dashboard() {
       <div className="workspace">
         <aside className="side">
           <section className="card" aria-labelledby="form-title">
-            <CardHead id="form-title" title="maat_swap" sub="What the agent asks the gate to sign." />
+            <CardHead
+              id="form-title"
+              title="maat_swap"
+              sub="What the agent asks the gate to sign."
+            />
             <form className="form" onSubmit={submit}>
               <div className="field">
                 <label htmlFor="token">Token to buy (mainnet address)</label>
-                <input id="token" className="input mono" value={token} onChange={(e) => setToken(e.target.value)} placeholder="0x…" spellCheck={false} autoComplete="off" required pattern="^0x[0-9a-fA-F]{40}$" />
+                <input
+                  id="token"
+                  className="input mono"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder="0x…"
+                  spellCheck={false}
+                  autoComplete="off"
+                  required
+                  pattern="^0x[0-9a-fA-F]{40}$"
+                />
                 <span className="presets">
                   <span className="hint">Try:</span>
                   {PRESETS.map((preset) => (
-                    <button key={preset.address} type="button" className="preset" onClick={() => setToken(preset.address)}>
+                    <button
+                      key={preset.address}
+                      type="button"
+                      className="preset"
+                      onClick={() => setToken(preset.address)}
+                    >
                       {preset.label}
                     </button>
                   ))}
@@ -201,22 +261,43 @@ export function Dashboard() {
               <div className="field">
                 <span className="label">Pay with ETH</span>
                 <div className="row">
-                  <input className="input num" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label="Amount" required />
+                  <input
+                    className="input num"
+                    inputMode="decimal"
+                    value={amountText}
+                    onChange={(e) => setAmountText(e.target.value)}
+                    aria-label="Amount"
+                    required
+                  />
                   <span className="seg" role="group" aria-label="Amount unit">
                     {(["USD", "ETH"] as const).map((option) => (
-                      <button key={option} type="button" aria-pressed={unit === option} onClick={() => setUnit(option)}>
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={unit === option}
+                        onClick={() => setUnit(option)}
+                      >
                         {option}
                       </button>
                     ))}
                   </span>
                 </div>
                 {chain && Number(amountText) > 0 ? (
-                  <span className="hint num">{unit === "USD" ? `≈ ${(Number(amountText) / chain.ethUsd).toPrecision(4)} ETH` : `≈ ${usd(Number(amountText) * chain.ethUsd)}`}</span>
+                  <span className="hint num">
+                    {unit === "USD"
+                      ? `≈ ${(Number(amountText) / chain.ethUsd).toPrecision(4)} ETH`
+                      : `≈ ${usd(Number(amountText) * chain.ethUsd)}`}
+                  </span>
                 ) : null}
               </div>
               <div className="field">
                 <label htmlFor="source">Instruction came from</label>
-                <select id="source" className="select" value={source} onChange={(e) => setSource(e.target.value as InstructionSource)}>
+                <select
+                  id="source"
+                  className="select"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value as InstructionSource)}
+                >
                   {SOURCES.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -226,11 +307,23 @@ export function Dashboard() {
               </div>
               <div className="field">
                 <label htmlFor="instruction">Instruction text</label>
-                <textarea id="instruction" className="textarea" value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="What the agent read, e.g. a post telling it to buy now" />
+                <textarea
+                  id="instruction"
+                  className="textarea"
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  placeholder="What the agent read, e.g. a post telling it to buy now"
+                />
               </div>
               <div className="field">
                 <label htmlFor="agent">Agent ID</label>
-                <input id="agent" className="input" value={agentId} onChange={(e) => setAgentId(e.target.value)} required />
+                <input
+                  id="agent"
+                  className="input"
+                  value={agentId}
+                  onChange={(e) => setAgentId(e.target.value)}
+                  required
+                />
               </div>
               <button className="btn btn-primary" type="submit" disabled={running}>
                 <Icon name="run" />
@@ -243,7 +336,12 @@ export function Dashboard() {
           <section aria-labelledby="log-title" className="side">
             <div className="log-head">
               <h2 id="log-title">Decision log</h2>
-              <button type="button" className="btn btn-ghost" onClick={resetDemo} title="Clear today's allowed total and the log">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={resetDemo}
+                title="Clear today's allowed total and the log"
+              >
                 <Icon name="reset" />
                 Reset demo data
               </button>
@@ -251,14 +349,26 @@ export function Dashboard() {
             <div className="log-list">
               {decisions.length ? (
                 decisions.map((decision) => (
-                  <button key={decision.id} type="button" className="log-row" aria-pressed={selected?.id === decision.id && !running} onClick={() => setSelectedId(decision.id)}>
+                  <button
+                    key={decision.id}
+                    type="button"
+                    className="log-row"
+                    aria-pressed={selected?.id === decision.id && !running}
+                    onClick={() => setSelectedId(decision.id)}
+                  >
                     <span className="log-pair">{`${usd(decision.intent.amountUsd)} of ETH → ${decision.token?.symbol ?? short(decision.intent.tokenOut)}`}</span>
                     <VerdictChip verdict={decision.verdict} />
                     <span className="log-reason">{decision.reasons[0]}</span>
                     <span className="log-meta">
                       <span className="mono">{clock(decision.createdAt)}</span>
                       <b>{ms(decision.timings.totalMs)}</b>
-                      <span>{decision.decidedBy === "jev" ? `JEV ${pct(decision.confidence ?? 0, 0)}` : decision.decidedBy === "rule" ? `rule ${decision.rule}` : "fallback"}</span>
+                      <span>
+                        {decision.decidedBy === "jev"
+                          ? `JEV ${pct(decision.confidence ?? 0, 0)}`
+                          : decision.decidedBy === "rule"
+                            ? `rule ${decision.rule}`
+                            : "fallback"}
+                      </span>
                     </span>
                   </button>
                 ))
@@ -317,7 +427,11 @@ function Integrations({ app }: { app: AppState | null }) {
   return (
     <div className="status" aria-label="Integration status">
       {item(true, "Uniswap", integrations.uniswapApi ? "Trading API" : "on-chain v2/v3 quoter")}
-      {item(integrations.intercepta, "Intercepta", integrations.intercepta ? "live" : "not configured")}
+      {item(
+        integrations.intercepta,
+        "Intercepta",
+        integrations.intercepta ? "live" : "not configured",
+      )}
       {item(integrations.jev, "JEV", integrations.jev ? "live" : "not configured · fallback only")}
       {item(true, "Explorer", integrations.explorer)}
       {item(app.watchlistSize > 0, "Watchlist", `${app.watchlistSize} addresses`)}
@@ -326,7 +440,13 @@ function Integrations({ app }: { app: AppState | null }) {
 }
 
 function Kpis({ app, decisions }: { app: AppState | null; decisions: Decision[] }) {
-  const counts = useMemo(() => Object.fromEntries(VERDICTS.map((verdict) => [verdict, decisions.filter((d) => d.verdict === verdict).length])) as Record<string, number>, [decisions]);
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        VERDICTS.map((verdict) => [verdict, decisions.filter((d) => d.verdict === verdict).length]),
+      ) as Record<string, number>,
+    [decisions],
+  );
   if (!app) return null;
   const { policy } = app;
   const times = decisions.map((decision) => decision.timings.totalMs);
@@ -336,13 +456,30 @@ function Kpis({ app, decisions }: { app: AppState | null; decisions: Decision[] 
       <div className="card kpi">
         <p className="eyebrow">Swaps screened (this server session)</p>
         <p className="kpi-value">{decisions.length}</p>
-        <div className="mix" role="img" aria-label={VERDICTS.map((v) => `${VERDICT_META[v].label} ${counts[v]}`).join(", ")}>
-          {VERDICTS.map((verdict) => (counts[verdict] ? <span key={verdict} style={{ flex: `${counts[verdict]} 1 0`, background: `var(--${VERDICT_META[verdict].cls})` }} /> : null))}
+        <div
+          className="mix"
+          role="img"
+          aria-label={VERDICTS.map((v) => `${VERDICT_META[v].label} ${counts[v]}`).join(", ")}
+        >
+          {VERDICTS.map((verdict) =>
+            counts[verdict] ? (
+              <span
+                key={verdict}
+                style={{
+                  flex: `${counts[verdict]} 1 0`,
+                  background: `var(--${VERDICT_META[verdict].cls})`,
+                }}
+              />
+            ) : null,
+          )}
         </div>
         <div className="legend">
           {VERDICTS.map((verdict) => (
             <span key={verdict}>
-              <Icon name={VERDICT_META[verdict].icon} className={`c-${VERDICT_META[verdict].cls}`} />
+              <Icon
+                name={VERDICT_META[verdict].icon}
+                className={`c-${VERDICT_META[verdict].cls}`}
+              />
               {VERDICT_META[verdict].label}
               <b>{counts[verdict]}</b>
             </span>
@@ -356,14 +493,21 @@ function Kpis({ app, decisions }: { app: AppState | null; decisions: Decision[] 
           <small>{`/ ${usd(policy.dailyLimit)}`}</small>
         </p>
         <div className="bar-track">
-          <span className={`bar-fill${used > 1 ? " over" : ""}`} style={{ width: `${Math.min(100, used * 100)}%` }} />
+          <span
+            className={`bar-fill${used > 1 ? " over" : ""}`}
+            style={{ width: `${Math.min(100, used * 100)}%` }}
+          />
         </div>
         <p className="kpi-note">Counted toward the daily limit (H3).</p>
       </div>
       <div className="card kpi">
         <p className="eyebrow">Median decision time</p>
         <p className="kpi-value">{times.length ? ms(median(times)) : "—"}</p>
-        <p className="kpi-note">{times.length ? `Measured over ${times.length} decision${times.length === 1 ? "" : "s"}; slowest ${ms(Math.max(...times))}.` : "Measured per request."}</p>
+        <p className="kpi-note">
+          {times.length
+            ? `Measured over ${times.length} decision${times.length === 1 ? "" : "s"}; slowest ${ms(Math.max(...times))}.`
+            : "Measured per request."}
+        </p>
       </div>
       <div className="card kpi">
         <p className="eyebrow">Policy</p>
@@ -402,8 +546,14 @@ function Intro() {
   return (
     <section className="card intro">
       <p className="eyebrow">Maat · pre-signing gate</p>
-      <h1>The agent holds no keys. Every swap is screened, weighed, then signed, blocked, or sent to its owner.</h1>
-      <p>Enter a token on Ethereum mainnet and screen a buy. Each request runs live against mainnet: nothing on this page is precomputed.</p>
+      <h1>
+        The agent holds no keys. Every swap is screened, weighed, then signed, blocked, or sent to
+        its owner.
+      </h1>
+      <p>
+        Enter a token on Ethereum mainnet and screen a buy. Each request runs live against mainnet:
+        nothing on this page is precomputed.
+      </p>
       <ol className="steps">
         <li>
           <b>Uniswap quote</b>Route, amount out, and price impact for the exact size.
@@ -412,10 +562,12 @@ function Intro() {
           <b>Intercepta</b>Token scan, plus a quick scan of the deployer and its funders.
         </li>
         <li>
-          <b>Deployer forensics</b>The real signer behind the launch, its other tokens, and where its ETH came from.
+          <b>Deployer forensics</b>The real signer behind the launch, its other tokens, and where
+          its ETH came from.
         </li>
         <li>
-          <b>Rules, then JEV</b>Hard limits first; JEV judges the rest and returns a typed verdict with confidence.
+          <b>Rules, then JEV</b>Hard limits first; JEV judges the rest and returns a typed verdict
+          with confidence.
         </li>
       </ol>
     </section>
@@ -451,13 +603,28 @@ function DecisionView({ decision }: { decision: Decision }) {
   const { quote, forensics, token } = decision;
   const symbol = token?.symbol ?? short(decision.intent.tokenOut);
   const facts: [string, React.ReactNode][] = [];
-  facts.push(["Swap value", `${usd(decision.intent.amountUsd)}${decision.ethUsd ? ` at ETH ${usd(decision.ethUsd)}` : ""}`]);
+  facts.push([
+    "Swap value",
+    `${usd(decision.intent.amountUsd)}${decision.ethUsd ? ` at ETH ${usd(decision.ethUsd)}` : ""}`,
+  ]);
   if (quote) {
     facts.push(["Quote", `${amount(quote.amountIn)} ETH → ${amount(quote.amountOut)} ${symbol}`]);
-    facts.push(["Price impact", quote.priceImpactPct === null ? "not reported" : quote.priceImpactPct < 0.01 ? "< 0.01%" : `${quote.priceImpactPct.toFixed(2)}%`]);
+    facts.push([
+      "Price impact",
+      quote.priceImpactPct === null
+        ? "not reported"
+        : quote.priceImpactPct < 0.01
+          ? "< 0.01%"
+          : `${quote.priceImpactPct.toFixed(2)}%`,
+    ]);
     if (quote.minOut) facts.push(["Min out (2% slippage)", `${amount(quote.minOut)} ${symbol}`]);
     facts.push(["Route", quote.route]);
-    facts.push(["Quote source", quote.provider === "trading-api" ? `Uniswap Trading API · ${quote.routing}` : `Uniswap contracts via eth_call · block ${quote.blockNumber}`]);
+    facts.push([
+      "Quote source",
+      quote.provider === "trading-api"
+        ? `Uniswap Trading API · ${quote.routing}`
+        : `Uniswap contracts via eth_call · block ${quote.blockNumber}`,
+    ]);
   } else if (decision.quoteError) {
     facts.push(["Quote", `failed: ${decision.quoteError}`]);
   }
@@ -471,7 +638,12 @@ function DecisionView({ decision }: { decision: Decision }) {
     ]);
   }
   if (decision.tokenScan) {
-    facts.push(["Intercepta token scan", decision.tokenScan.error ? `failed: ${decision.tokenScan.error}` : `${decision.tokenScan.riskLevel} · risk ${decision.tokenScan.riskScore} · ${decision.tokenScan.action}`]);
+    facts.push([
+      "Intercepta token scan",
+      decision.tokenScan.error
+        ? `failed: ${decision.tokenScan.error}`
+        : `${decision.tokenScan.riskLevel} · risk ${decision.tokenScan.riskScore} · ${decision.tokenScan.action}`,
+    ]);
   }
 
   return (
@@ -514,8 +686,20 @@ function DecisionView({ decision }: { decision: Decision }) {
           </div>
           <div className="verdict-meta">
             <div>
-              <b>{decision.confidence !== undefined ? pct(decision.confidence) : decision.decidedBy === "rule" ? decision.rule : "—"}</b>
-              <span>{decision.confidence !== undefined ? "JEV confidence" : decision.decidedBy === "rule" ? "hard rule" : "fallback"}</span>
+              <b>
+                {decision.confidence !== undefined
+                  ? pct(decision.confidence)
+                  : decision.decidedBy === "rule"
+                    ? decision.rule
+                    : "—"}
+              </b>
+              <span>
+                {decision.confidence !== undefined
+                  ? "JEV confidence"
+                  : decision.decidedBy === "rule"
+                    ? "hard rule"
+                    : "fallback"}
+              </span>
             </div>
             <div>
               <b>{ms(decision.timings.totalMs)}</b>
@@ -525,7 +709,12 @@ function DecisionView({ decision }: { decision: Decision }) {
           <p className="verdict-caption">{meta.caption}</p>
         </div>
       </article>
-      <Timeline stages={decision.stages} elapsed={decision.timings.totalMs} totalMs={decision.timings.totalMs} running={false} />
+      <Timeline
+        stages={decision.stages}
+        elapsed={decision.timings.totalMs}
+        totalMs={decision.timings.totalMs}
+        running={false}
+      />
       <Evidence decision={decision} />
       {forensics ? (
         <div className="two-up">

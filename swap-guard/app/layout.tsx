@@ -3,7 +3,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Maat Swap Guard",
-  description: "Pre-signing gate for an AI agent's Uniswap swaps on Ethereum mainnet: live Uniswap quote, Intercepta scans, deployer forensics, and a JEV verdict.",
+  description:
+    "Pre-signing gate for an AI agent's Uniswap swaps on Ethereum mainnet: live Uniswap quote, Intercepta scans, deployer forensics, and a JEV verdict.",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };

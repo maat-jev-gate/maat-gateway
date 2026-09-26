@@ -48,16 +48,32 @@ test("forwards the authenticated Agent intent and returns the Guard decision unc
 test("passes through Guard input errors", async () => {
   process.env.SWAP_GUARD_URL = "https://swap.example.test";
   globalThis.fetch = async () => Response.json({ error: "Unsupported token." }, { status: 400 });
-  await assert.rejects(screenSwap(input), (error: unknown) => error instanceof SwapGuardError && error.status === 400 && error.message === "Unsupported token.");
+  await assert.rejects(
+    screenSwap(input),
+    (error: unknown) =>
+      error instanceof SwapGuardError &&
+      error.status === 400 &&
+      error.message === "Unsupported token.",
+  );
 });
 
 test("rejects an upstream decision for a different token", async () => {
   process.env.SWAP_GUARD_URL = "https://swap.example.test";
-  globalThis.fetch = async () => Response.json({ ...decision, intent: { tokenOut: "0x6982508145454Ce325dDbE47a25d4ec3d2311933" } });
-  await assert.rejects(screenSwap(input), (error: unknown) => error instanceof SwapGuardError && error.status === 502);
+  globalThis.fetch = async () =>
+    Response.json({
+      ...decision,
+      intent: { tokenOut: "0x6982508145454Ce325dDbE47a25d4ec3d2311933" },
+    });
+  await assert.rejects(
+    screenSwap(input),
+    (error: unknown) => error instanceof SwapGuardError && error.status === 502,
+  );
 });
 
 test("rejects an insecure non-local Guard origin", async () => {
   process.env.SWAP_GUARD_URL = "http://swap.example.test";
-  await assert.rejects(screenSwap(input), (error: unknown) => error instanceof SwapGuardError && error.status === 503);
+  await assert.rejects(
+    screenSwap(input),
+    (error: unknown) => error instanceof SwapGuardError && error.status === 503,
+  );
 });

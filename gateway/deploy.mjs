@@ -14,10 +14,12 @@ const service = "maat-gateway";
 const caddyFile = join(root, "deploy/caddy/site.caddy");
 
 function parseEnv(text) {
-  return Object.fromEntries(text.split(/\r?\n/).flatMap((line) => {
-    const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-    return match ? [[match[1], match[2].replace(/^['"]|['"]$/g, "")]] : [];
-  }));
+  return Object.fromEntries(
+    text.split(/\r?\n/).flatMap((line) => {
+      const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+      return match ? [[match[1], match[2].replace(/^['"]|['"]$/g, "")]] : [];
+    }),
+  );
 }
 
 async function command(file, args, options = {}) {
@@ -29,16 +31,21 @@ async function command(file, args, options = {}) {
 
 const env = parseEnv(await readFile(join(root, ".env"), "utf8"));
 if (!env.DEPLOY_HOST) throw new Error("Missing DEPLOY_HOST in .env");
-if (!env.DEPLOY_DOMAIN || !/^[a-z0-9.-]+$/i.test(env.DEPLOY_DOMAIN)) throw new Error("DEPLOY_DOMAIN must be a hostname");
+if (!env.DEPLOY_DOMAIN || !/^[a-z0-9.-]+$/i.test(env.DEPLOY_DOMAIN))
+  throw new Error("DEPLOY_DOMAIN must be a hostname");
 
 const host = env.DEPLOY_HOST;
-if (!/^[a-z0-9][a-z0-9._@-]*$/i.test(host)) throw new Error("DEPLOY_HOST must be an SSH host or user@host");
+if (!/^[a-z0-9][a-z0-9._@-]*$/i.test(host))
+  throw new Error("DEPLOY_HOST must be an SSH host or user@host");
 const domain = env.DEPLOY_DOMAIN;
 const port = Number(env.PORT ?? 8787);
-if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("PORT must be a valid user-space port");
+if (!Number.isInteger(port) || port < 1024 || port > 65535)
+  throw new Error("PORT must be a valid user-space port");
 const caddyConfig = await readFile(caddyFile, "utf8");
-if (!caddyConfig.trimStart().startsWith(`${domain} {`)) throw new Error("deploy/caddy/site.caddy must use DEPLOY_DOMAIN as its site address");
-if (!caddyConfig.includes(`reverse_proxy 127.0.0.1:${port}`)) throw new Error("deploy/caddy/site.caddy must proxy to PORT");
+if (!caddyConfig.trimStart().startsWith(`${domain} {`))
+  throw new Error("deploy/caddy/site.caddy must use DEPLOY_DOMAIN as its site address");
+if (!caddyConfig.includes(`reverse_proxy 127.0.0.1:${port}`))
+  throw new Error("deploy/caddy/site.caddy must proxy to PORT");
 
 async function ssh(script) {
   return command("ssh", [host, script.trim()]);
@@ -58,7 +65,14 @@ if [ -f /etc/caddy/sites/${domain}.caddy ]; then cp /etc/caddy/sites/${domain}.c
 `);
 
 await command("rsync", ["-az", "--delete", `${join(root, "dist")}/`, `${host}:${appDir}/dist/`]);
-await command("rsync", ["-az", "server.ts", "package.json", "package-lock.json", "ecosystem.config.cjs", `${host}:${appDir}/`]);
+await command("rsync", [
+  "-az",
+  "server.ts",
+  "package.json",
+  "package-lock.json",
+  "ecosystem.config.cjs",
+  `${host}:${appDir}/`,
+]);
 await command("rsync", ["-az", "server/", `${host}:${appDir}/server/`]);
 await command("rsync", ["-az", ".env", `${host}:${appDir}/.env`]);
 await command("rsync", ["-az", caddyFile, `${host}:/etc/caddy/sites/${domain}.caddy`]);

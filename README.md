@@ -30,9 +30,9 @@ DNS should point these hostnames to the deployment server. Caddy terminates HTTP
 
 | Integration | Call and decision locations |
 | --- | --- |
-| World ID for Agents | [Start OIDC authorization](gateway/server/app.ts#L480), [verify the ID token](gateway/server/app.ts#L248), and [handle the callback and release the approved payment](gateway/server/app.ts#L497) |
-| Uniswap | [Request a Trading API quote](swap-guard/lib/uniswap.ts#L122) or [quote v2/v3 contracts onchain](swap-guard/lib/uniswap.ts#L54); the [Swap Guard decision pipeline](swap-guard/lib/engine.ts#L35) uses the quote for analysis only |
-| Intercepta | [Call the live API](gateway/server/intercepta.ts#L49), [screen the x402 recipient and token](gateway/server/intercepta.ts#L64), and [apply the result before payment signing](gateway/server/app.ts#L577); Swap Guard also [scans tokens](swap-guard/lib/intercepta.ts#L79) |
+| World ID for Agents | [Start OIDC authorization](gateway/server/app.ts#L749), [verify the ID token](gateway/server/app.ts#L316), and [handle the callback and release the approved payment](gateway/server/app.ts#L802) |
+| Uniswap | [Request a Trading API quote](swap-guard/lib/uniswap.ts#L175) or [quote v2/v3 contracts onchain](swap-guard/lib/uniswap.ts#L73); the [Swap Guard decision pipeline](swap-guard/lib/engine.ts#L54) uses the quote for analysis only |
+| Intercepta | [Call the live API](gateway/server/intercepta.ts#L92), [screen the x402 recipient and token](gateway/server/intercepta.ts#L120), and [apply the result before payment signing](gateway/server/app.ts#L971); Swap Guard also [scans tokens](swap-guard/lib/intercepta.ts#L108) |
 
 ## Integration feedback
 

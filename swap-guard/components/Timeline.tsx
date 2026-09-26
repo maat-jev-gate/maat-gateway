@@ -23,31 +23,59 @@ function niceStep(domain: number) {
   return step;
 }
 
-export function Timeline({ stages, elapsed, totalMs, running }: { stages: Stage[]; elapsed: number; totalMs?: number; running: boolean }) {
+export function Timeline({
+  stages,
+  elapsed,
+  totalMs,
+  running,
+}: {
+  stages: Stage[];
+  elapsed: number;
+  totalMs?: number;
+  running: boolean;
+}) {
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const endOf = (stage: Stage) => stage.end ?? elapsed;
-  const shown = running ? elapsed : totalMs ?? elapsed;
+  const shown = running ? elapsed : (totalMs ?? elapsed);
   const step = niceStep(Math.max(shown, 200));
   const domain = Math.ceil(Math.max(shown, 1) / step) * step;
   const ticks = Array.from({ length: Math.round(domain / step) + 1 }, (_, index) => index * step);
 
-  const lookups = LOOKUPS.map((key) => byKey.get(key)).filter((stage): stage is Stage => Boolean(stage && stage.status !== "skipped" && stage.end !== undefined));
-  const windowMs = lookups.length ? Math.max(...lookups.map((stage) => stage.end!)) - Math.min(...lookups.map((stage) => stage.start)) : 0;
+  const lookups = LOOKUPS.map((key) => byKey.get(key)).filter((stage): stage is Stage =>
+    Boolean(stage && stage.status !== "skipped" && stage.end !== undefined),
+  );
+  const windowMs = lookups.length
+    ? Math.max(...lookups.map((stage) => stage.end!)) -
+      Math.min(...lookups.map((stage) => stage.start))
+    : 0;
   const serialMs = lookups.reduce((total, stage) => total + (stage.end! - stage.start), 0);
   const jev = byKey.get("jev");
 
   return (
     <section className="card" aria-labelledby="tl-title">
-      <CardHead id="tl-title" title="From intent to verdict" sub="Every bar is a measured duration from this request. The lookups run side by side, then the rules and JEV decide." />
+      <CardHead
+        id="tl-title"
+        title="From intent to verdict"
+        sub="Every bar is a measured duration from this request. The lookups run side by side, then the rules and JEV decide."
+      />
       <div className="tl-body">
         <div className="tl-hero">
           <p className="hero-num">
-            {shown >= 10_000 ? (shown / 1000).toFixed(1) : Math.round(shown).toLocaleString("en-US")}
+            {shown >= 10_000
+              ? (shown / 1000).toFixed(1)
+              : Math.round(shown).toLocaleString("en-US")}
             <span className="unit">{shown >= 10_000 ? "s" : "ms"}</span>
           </p>
           <p className="hero-cap">{running ? "running…" : "from request to verdict"}</p>
-          <div className="bar-track" role="img" aria-label={`${Math.round((shown / ETH_BLOCK_MS) * 100)}% of one Ethereum block`}>
-            <span className={`bar-fill${shown > ETH_BLOCK_MS ? " over" : ""}`} style={{ width: `${Math.min(100, (shown / ETH_BLOCK_MS) * 100)}%` }} />
+          <div
+            className="bar-track"
+            role="img"
+            aria-label={`${Math.round((shown / ETH_BLOCK_MS) * 100)}% of one Ethereum block`}
+          >
+            <span
+              className={`bar-fill${shown > ETH_BLOCK_MS ? " over" : ""}`}
+              style={{ width: `${Math.min(100, (shown / ETH_BLOCK_MS) * 100)}%` }}
+            />
           </div>
           <p className="hero-cap">{`${Math.round((shown / ETH_BLOCK_MS) * 100)}% of one Ethereum block (12 s)`}</p>
           {!running && lookups.length ? (
@@ -62,7 +90,13 @@ export function Timeline({ stages, elapsed, totalMs, running }: { stages: Stage[
               </div>
               <div>
                 <dt>JEV decision</dt>
-                <dd>{jev?.status === "done" && jev.end !== undefined ? ms(jev.end - jev.start) : jev?.status === "skipped" ? "not needed" : "fallback"}</dd>
+                <dd>
+                  {jev?.status === "done" && jev.end !== undefined
+                    ? ms(jev.end - jev.start)
+                    : jev?.status === "skipped"
+                      ? "not needed"
+                      : "fallback"}
+                </dd>
               </div>
             </dl>
           ) : null}
@@ -78,17 +112,25 @@ export function Timeline({ stages, elapsed, totalMs, running }: { stages: Stage[
                 </div>
                 <div className="wf-track">
                   {!stage ? (
-                    running ? null : <span className="wf-skip">not reached</span>
+                    running ? null : (
+                      <span className="wf-skip">not reached</span>
+                    )
                   ) : stage.status === "skipped" ? (
                     <span className="wf-skip">{stage.note ?? "skipped"}</span>
                   ) : (
                     <>
                       <span
                         className={`wf-bar${stage.status === "running" ? " running" : ""}${stage.status === "failed" ? " failed" : ""}`}
-                        style={{ left: `${(stage.start / domain) * 100}%`, width: `${((endOf(stage) - stage.start) / domain) * 100}%` }}
+                        style={{
+                          left: `${(stage.start / domain) * 100}%`,
+                          width: `${((endOf(stage) - stage.start) / domain) * 100}%`,
+                        }}
                         title={`${lane.name}: ${stage.start}–${Math.round(endOf(stage))} ms${stage.note ? ` · ${stage.note}` : ""}`}
                       />
-                      <span className="wf-val" style={{ left: `${(endOf(stage) / domain) * 100}%` }}>
+                      <span
+                        className="wf-val"
+                        style={{ left: `${(endOf(stage) / domain) * 100}%` }}
+                      >
                         {stage.status === "running" ? "…" : ms(endOf(stage) - stage.start)}
                         {stage.status === "failed" ? " ✕" : ""}
                       </span>

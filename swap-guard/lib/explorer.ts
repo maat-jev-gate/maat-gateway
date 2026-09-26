@@ -62,7 +62,12 @@ export type ContractCreation = {
 // is set (5 calls/s on the free tier), then Routescan's and Blockscout's keyless
 // Etherscan-compatible APIs. A provider that is rate limited or failing hands
 // the call to the next one.
-type Provider = { name: string; url: (query: URLSearchParams) => string; limit: ReturnType<typeof limiter>; coolUntil?: number };
+type Provider = {
+  name: string;
+  url: (query: URLSearchParams) => string;
+  limit: ReturnType<typeof limiter>;
+  coolUntil?: number;
+};
 const COOL_DOWN_MS = 60_000;
 
 const PROVIDERS: Record<"etherscan" | "routescan" | "blockscout", Provider> = {
@@ -92,7 +97,8 @@ const RATE_LIMITED = /rate limit|too many requests/i;
 
 /** Logs each explorer call and its duration when MAAT_DEBUG=1. */
 function debug(label: string, startedAt: number, outcome: string) {
-  if (process.env.MAAT_DEBUG === "1") console.log(`[explorer] ${label} ${Math.round(performance.now() - startedAt)}ms ${outcome}`);
+  if (process.env.MAAT_DEBUG === "1")
+    console.log(`[explorer] ${label} ${Math.round(performance.now() - startedAt)}ms ${outcome}`);
 }
 
 function providers(): Provider[] {
@@ -101,7 +107,9 @@ function providers(): Provider[] {
 }
 
 export function explorerName(): string {
-  return providers().map((provider) => provider.name).join(" → ");
+  return providers()
+    .map((provider) => provider.name)
+    .join(" → ");
 }
 
 function withBlockscoutKey(url: string) {
@@ -115,7 +123,9 @@ async function blockscoutGet<T>(path: string): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     const startedAt = performance.now();
     try {
-      const result = await blockscoutV2Limit(() => fetchJson<T>(withBlockscoutKey(`${config.blockscoutUrl()}${path}`), { timeoutMs: 10_000 }));
+      const result = await blockscoutV2Limit(() =>
+        fetchJson<T>(withBlockscoutKey(`${config.blockscoutUrl()}${path}`), { timeoutMs: 10_000 }),
+      );
       debug(`blockscout-v2 ${path}`, startedAt, "ok");
       return result;
     } catch (caught) {
@@ -131,13 +141,21 @@ async function blockscoutGet<T>(path: string): Promise<T> {
 
 class RateLimited extends Error {}
 
-async function callProvider<T>(provider: Provider, params: Record<string, string>, attempts: number): Promise<T> {
+async function callProvider<T>(
+  provider: Provider,
+  params: Record<string, string>,
+  attempts: number,
+): Promise<T> {
   for (let attempt = 0; attempt < attempts; attempt++) {
     let body: ExplorerResponse<T>;
     const startedAt = performance.now();
     const label = `${provider.name} ${params.action} ${params.address ?? params.contractaddresses ?? ""}`;
     try {
-      body = await provider.limit(() => fetchJson<ExplorerResponse<T>>(provider.url(new URLSearchParams(params)), { timeoutMs: 15_000 }));
+      body = await provider.limit(() =>
+        fetchJson<ExplorerResponse<T>>(provider.url(new URLSearchParams(params)), {
+          timeoutMs: 15_000,
+        }),
+      );
       debug(label, startedAt, `status ${body.status} ${body.message ?? ""}`);
     } catch (caught) {
       debug(label, startedAt, errorMessage(caught).slice(0, 60));
@@ -149,7 +167,8 @@ async function callProvider<T>(provider: Provider, params: Record<string, string
     }
     if (body.status === "0") {
       const message = `${body.message ?? ""} ${typeof body.result === "string" ? body.result : ""}`;
-      if (/no (transactions|records|token transfers|internal transactions) found/i.test(message)) return [] as T;
+      if (/no (transactions|records|token transfers|internal transactions) found/i.test(message))
+        return [] as T;
       if (RATE_LIMITED.test(message)) {
         await sleep(600 * (attempt + 1));
         continue;
@@ -157,7 +176,8 @@ async function callProvider<T>(provider: Provider, params: Record<string, string
       if (Array.isArray(body.result)) return body.result;
       throw new Error(`${provider.name}: ${message.trim()}`);
     }
-    if (body.result === null || body.result === undefined) throw new Error(`${provider.name} returned no result: ${body.message ?? "unknown"}`);
+    if (body.result === null || body.result === undefined)
+      throw new Error(`${provider.name} returned no result: ${body.message ?? "unknown"}`);
     return body.result;
   }
   provider.coolUntil = Date.now() + COOL_DOWN_MS;
@@ -178,21 +198,48 @@ async function call<T>(params: Record<string, string>): Promise<T> {
       errors.push(caught instanceof Error ? caught.message : String(caught));
     }
   }
-  throw new Error(`Explorer unavailable (${errors.join("; ")}). Set ETHERSCAN_API_KEY for a dedicated quota.`);
+  throw new Error(
+    `Explorer unavailable (${errors.join("; ")}). Set ETHERSCAN_API_KEY for a dedicated quota.`,
+  );
 }
 
-const page = (offset: number, sort: "asc" | "desc" = "asc") => ({ page: "1", offset: String(offset), sort });
+const page = (offset: number, sort: "asc" | "desc" = "asc") => ({
+  page: "1",
+  offset: String(offset),
+  sort,
+});
 
 export function txList(address: string, offset = 1000, sort: "asc" | "desc" = "asc") {
-  return call<ExplorerTx[]>({ module: "account", action: "txlist", address, startblock: "0", endblock: "99999999", ...page(offset, sort) });
+  return call<ExplorerTx[]>({
+    module: "account",
+    action: "txlist",
+    address,
+    startblock: "0",
+    endblock: "99999999",
+    ...page(offset, sort),
+  });
 }
 
 export function internalTxList(address: string, offset = 200) {
-  return call<ExplorerInternalTx[]>({ module: "account", action: "txlistinternal", address, startblock: "0", endblock: "99999999", ...page(offset) });
+  return call<ExplorerInternalTx[]>({
+    module: "account",
+    action: "txlistinternal",
+    address,
+    startblock: "0",
+    endblock: "99999999",
+    ...page(offset),
+  });
 }
 
 export function tokenTxList(address: string, contractAddress?: string, offset = 1000) {
-  const params: Record<string, string> = { module: "account", action: "tokentx", address, startblock: "0", endblock: "99999999", ...page(offset) };
+  const params: Record<string, string> = {
+    module: "account",
+    action: "tokentx",
+    address,
+    startblock: "0",
+    endblock: "99999999",
+    ...page(offset),
+  };
   if (contractAddress) params.contractaddress = contractAddress;
   return call<ExplorerTokenTx[]>(params);
 }
@@ -200,7 +247,11 @@ export function tokenTxList(address: string, contractAddress?: string, offset = 
 /** Creation records for up to 5 contracts per call. */
 export async function contractCreations(addresses: string[]): Promise<ContractCreation[]> {
   if (!addresses.length) return [];
-  return call<ContractCreation[]>({ module: "contract", action: "getcontractcreation", contractaddresses: addresses.join(",") });
+  return call<ContractCreation[]>({
+    module: "contract",
+    action: "getcontractcreation",
+    contractaddresses: addresses.join(","),
+  });
 }
 
 type BlockscoutAddress = {
@@ -217,11 +268,18 @@ type BlockscoutAddress = {
  * outgoing transaction count (nonce) from the RPC when `withCount` is set.
  * Returns undefined when Blockscout is unreachable.
  */
-export async function addressLabel(address: string, withCount = false): Promise<AddressLabel | undefined> {
+export async function addressLabel(
+  address: string,
+  withCount = false,
+): Promise<AddressLabel | undefined> {
   try {
     const [info, nonce] = await Promise.all([
       blockscoutGet<BlockscoutAddress>(`/api/v2/addresses/${address}`),
-      withCount ? rpc().getTransactionCount({ address: address as Address }).catch(() => undefined) : undefined,
+      withCount
+        ? rpc()
+            .getTransactionCount({ address: address as Address })
+            .catch(() => undefined)
+        : undefined,
     ]);
     const tags = [
       ...(info.public_tags ?? []).map((tag) => tag.display_name ?? tag.label ?? ""),

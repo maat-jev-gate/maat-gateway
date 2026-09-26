@@ -7,5 +7,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return Response.json({ policy: POLICY, integrations: integrations(), watchlistSize, ...snapshot() });
+  return Response.json({
+    policy: POLICY,
+    integrations: integrations(),
+    watchlistSize,
+    ...snapshot(),
+  });
 }

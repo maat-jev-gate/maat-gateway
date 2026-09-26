@@ -1,14 +1,25 @@
 /* Small HTTP helpers: JSON fetch with a timeout, and a concurrency limiter. */
 
 export class HttpError extends Error {
-  constructor(message: string, readonly status: number, readonly body: unknown) {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly body: unknown,
+  ) {
     super(message);
   }
 }
 
-export async function fetchJson<T = unknown>(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+export async function fetchJson<T = unknown>(
+  url: string,
+  init: RequestInit & { timeoutMs?: number } = {},
+): Promise<T> {
   const { timeoutMs = 15_000, ...rest } = init;
-  const response = await fetch(url, { ...rest, cache: "no-store", signal: rest.signal ?? AbortSignal.timeout(timeoutMs) });
+  const response = await fetch(url, {
+    ...rest,
+    cache: "no-store",
+    signal: rest.signal ?? AbortSignal.timeout(timeoutMs),
+  });
   const text = await response.text();
   let body: unknown = text;
   try {
@@ -17,8 +28,13 @@ export async function fetchJson<T = unknown>(url: string, init: RequestInit & { 
     /* Keep the raw text for the error message. */
   }
   if (!response.ok) {
-    const detail = typeof body === "string" ? body.slice(0, 200) : JSON.stringify(body).slice(0, 200);
-    throw new HttpError(`HTTP ${response.status} from ${new URL(url).host}: ${detail}`, response.status, body);
+    const detail =
+      typeof body === "string" ? body.slice(0, 200) : JSON.stringify(body).slice(0, 200);
+    throw new HttpError(
+      `HTTP ${response.status} from ${new URL(url).host}: ${detail}`,
+      response.status,
+      body,
+    );
   }
   return body as T;
 }
@@ -50,10 +66,12 @@ export function limiter(max: number, spacingMs = 0) {
     return new Promise<T>((resolve, reject) => {
       queue.push(() => {
         active++;
-        task().then(resolve, reject).finally(() => {
-          active--;
-          next();
-        });
+        task()
+          .then(resolve, reject)
+          .finally(() => {
+            active--;
+            next();
+          });
       });
       next();
     });

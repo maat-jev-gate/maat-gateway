@@ -24,14 +24,18 @@ export async function POST(request: Request) {
     try {
       return Response.json(await analyzeSwap(input));
     } catch (caught) {
-      return Response.json({ error: errorMessage(caught) }, { status: caught instanceof RequestError ? 400 : 502 });
+      return Response.json(
+        { error: errorMessage(caught) },
+        { status: caught instanceof RequestError ? 400 : 502 },
+      );
     }
   }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (event: StreamEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      const send = (event: StreamEvent) =>
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       try {
         await analyzeSwap(input, send);
       } catch (caught) {
@@ -41,5 +45,7 @@ export async function POST(request: Request) {
       }
     },
   });
-  return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" } });
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" },
+  });
 }

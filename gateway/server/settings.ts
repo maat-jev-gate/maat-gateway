@@ -23,18 +23,31 @@ export const gatewaySettings: GatewaySettings = {
   bypassMerchantRequest: false,
   jevBypassVerdict: "ESCALATE",
   worldBypassVerdict: "ALLOW",
-  merchantUrl: process.env.MERCHANT_URL?.trim() || "https://merchant.maat-jev-gate.online/merchant/dataset/demo-1",
+  merchantUrl:
+    process.env.MERCHANT_URL?.trim() ||
+    "https://merchant.maat-jev-gate.online/merchant/dataset/demo-1",
 };
 
 export function updateGatewaySettings(input: Partial<GatewaySettings>): GatewaySettings {
   if (typeof input.bypassJev === "boolean") gatewaySettings.bypassJev = input.bypassJev;
-  if (typeof input.bypassIntercepta === "boolean") gatewaySettings.bypassIntercepta = input.bypassIntercepta;
-  if (input.interceptaBypassVerdict === "ALLOW" || input.interceptaBypassVerdict === "BLOCK") gatewaySettings.interceptaBypassVerdict = input.interceptaBypassVerdict;
-  if (typeof input.bypassRealPayment === "boolean") gatewaySettings.bypassRealPayment = input.bypassRealPayment;
+  if (typeof input.bypassIntercepta === "boolean")
+    gatewaySettings.bypassIntercepta = input.bypassIntercepta;
+  if (input.interceptaBypassVerdict === "ALLOW" || input.interceptaBypassVerdict === "BLOCK")
+    gatewaySettings.interceptaBypassVerdict = input.interceptaBypassVerdict;
+  if (typeof input.bypassRealPayment === "boolean")
+    gatewaySettings.bypassRealPayment = input.bypassRealPayment;
   if (typeof input.bypassWorldId === "boolean") gatewaySettings.bypassWorldId = input.bypassWorldId;
-  if (typeof input.bypassMerchantRequest === "boolean") gatewaySettings.bypassMerchantRequest = input.bypassMerchantRequest;
-  if (input.jevBypassVerdict === "ALLOW" || input.jevBypassVerdict === "BLOCK" || input.jevBypassVerdict === "ESCALATE") gatewaySettings.jevBypassVerdict = input.jevBypassVerdict;
-  if (input.worldBypassVerdict === "ALLOW" || input.worldBypassVerdict === "BLOCK") gatewaySettings.worldBypassVerdict = input.worldBypassVerdict;
-  if (typeof input.merchantUrl === "string" && input.merchantUrl.trim()) gatewaySettings.merchantUrl = input.merchantUrl.trim();
+  if (typeof input.bypassMerchantRequest === "boolean")
+    gatewaySettings.bypassMerchantRequest = input.bypassMerchantRequest;
+  if (
+    input.jevBypassVerdict === "ALLOW" ||
+    input.jevBypassVerdict === "BLOCK" ||
+    input.jevBypassVerdict === "ESCALATE"
+  )
+    gatewaySettings.jevBypassVerdict = input.jevBypassVerdict;
+  if (input.worldBypassVerdict === "ALLOW" || input.worldBypassVerdict === "BLOCK")
+    gatewaySettings.worldBypassVerdict = input.worldBypassVerdict;
+  if (typeof input.merchantUrl === "string" && input.merchantUrl.trim())
+    gatewaySettings.merchantUrl = input.merchantUrl.trim();
   return { ...gatewaySettings };
 }

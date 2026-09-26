@@ -27,7 +27,15 @@ export type Policy = {
   confidenceThreshold: number;
 };
 
-export type StageKey = "price" | "quote" | "tokenScan" | "deployer" | "history" | "funding" | "jev" | "enforce";
+export type StageKey =
+  | "price"
+  | "quote"
+  | "tokenScan"
+  | "deployer"
+  | "history"
+  | "funding"
+  | "jev"
+  | "enforce";
 export type StageStatus = "running" | "done" | "skipped" | "failed";
 
 export type Stage = {
@@ -175,7 +183,13 @@ export type Decision = {
   signals: Signal[];
   intent: SwapIntent;
   policy: Policy;
-  timings: { totalMs: number; interceptaMs?: number; uniswapMs?: number; forensicsMs?: number; jevMs?: number };
+  timings: {
+    totalMs: number;
+    interceptaMs?: number;
+    uniswapMs?: number;
+    forensicsMs?: number;
+    jevMs?: number;
+  };
   raw: { intercepta?: unknown[]; uniswapQuote?: unknown; jevRequest?: unknown; jev?: unknown };
   /** Mainnet swaps are analysed only; nothing is signed or broadcast. */
   analysisOnly: true;

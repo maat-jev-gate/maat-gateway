@@ -20,15 +20,24 @@ const V3_FEES = [100, 500, 3000, 10000] as const;
 const DEFAULT_SWAPPER: Address = "0x000000000000000000000000000000000000dEaD";
 const SLIPPAGE_PCT = 2;
 
-const v2RouterAbi = parseAbi(["function getAmountsOut(uint256 amountIn, address[] path) view returns (uint256[] amounts)"]);
+const v2RouterAbi = parseAbi([
+  "function getAmountsOut(uint256 amountIn, address[] path) view returns (uint256[] amounts)",
+]);
 const v2FactoryAbi = parseAbi(["function getPair(address, address) view returns (address)"]);
-const v3FactoryAbi = parseAbi(["function getPool(address, address, uint24) view returns (address)"]);
+const v3FactoryAbi = parseAbi([
+  "function getPool(address, address, uint24) view returns (address)",
+]);
 const quoterV2Abi = parseAbi([
   "struct QuoteExactInputSingleParams { address tokenIn; address tokenOut; uint256 amountIn; uint24 fee; uint160 sqrtPriceLimitX96; }",
   "function quoteExactInputSingle(QuoteExactInputSingleParams params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
 ]);
 
-async function v3Quote(tokenIn: Address, tokenOut: Address, amountIn: bigint, fee: number): Promise<bigint> {
+async function v3Quote(
+  tokenIn: Address,
+  tokenOut: Address,
+  amountIn: bigint,
+  fee: number,
+): Promise<bigint> {
   const { result } = await rpc().simulateContract({
     address: V3_QUOTER_V2,
     abi: quoterV2Abi,
@@ -39,7 +48,12 @@ async function v3Quote(tokenIn: Address, tokenOut: Address, amountIn: bigint, fe
 }
 
 async function v2Quote(tokenIn: Address, tokenOut: Address, amountIn: bigint): Promise<bigint> {
-  const amounts = await rpc().readContract({ address: V2_ROUTER, abi: v2RouterAbi, functionName: "getAmountsOut", args: [amountIn, [tokenIn, tokenOut]] });
+  const amounts = await rpc().readContract({
+    address: V2_ROUTER,
+    abi: v2RouterAbi,
+    functionName: "getAmountsOut",
+    args: [amountIn, [tokenIn, tokenOut]],
+  });
   return amounts[amounts.length - 1];
 }
 
@@ -49,21 +63,40 @@ export async function ethUsdPrice(): Promise<number> {
   return Number(formatUnits(out, 6));
 }
 
-type Candidate = { protocol: "V2" | "V3"; fee?: number; out: bigint; quote: (amount: bigint) => Promise<bigint> };
+type Candidate = {
+  protocol: "V2" | "V3";
+  fee?: number;
+  out: bigint;
+  quote: (amount: bigint) => Promise<bigint>;
+};
 
-async function onchainQuote(token: TokenInfo, amountInWei: bigint): Promise<{ summary: QuoteSummary; raw: unknown }> {
+async function onchainQuote(
+  token: TokenInfo,
+  amountInWei: bigint,
+): Promise<{ summary: QuoteSummary; raw: unknown }> {
   const tokenOut = token.address as Address;
   const attempts: Promise<Candidate | null>[] = [
     v2Quote(WETH, tokenOut, amountInWei)
-      .then((out) => ({ protocol: "V2" as const, out, quote: (amount: bigint) => v2Quote(WETH, tokenOut, amount) }))
+      .then((out) => ({
+        protocol: "V2" as const,
+        out,
+        quote: (amount: bigint) => v2Quote(WETH, tokenOut, amount),
+      }))
       .catch(() => null),
     ...V3_FEES.map((fee) =>
       v3Quote(WETH, tokenOut, amountInWei, fee)
-        .then((out) => ({ protocol: "V3" as const, fee, out, quote: (amount: bigint) => v3Quote(WETH, tokenOut, amount, fee) }))
+        .then((out) => ({
+          protocol: "V3" as const,
+          fee,
+          out,
+          quote: (amount: bigint) => v3Quote(WETH, tokenOut, amount, fee),
+        }))
         .catch(() => null),
     ),
   ];
-  const candidates = (await Promise.all(attempts)).filter((item): item is Candidate => Boolean(item && item.out > 0n));
+  const candidates = (await Promise.all(attempts)).filter((item): item is Candidate =>
+    Boolean(item && item.out > 0n),
+  );
   if (!candidates.length) throw new Error("No Uniswap v2 or v3 WETH pool could quote this token.");
   const best = candidates.reduce((a, b) => (b.out > a.out ? b : a));
 
@@ -71,8 +104,18 @@ async function onchainQuote(token: TokenInfo, amountInWei: bigint): Promise<{ su
   const [refOut, pool, blockNumber] = await Promise.all([
     best.quote(refIn),
     best.protocol === "V2"
-      ? rpc().readContract({ address: V2_FACTORY, abi: v2FactoryAbi, functionName: "getPair", args: [WETH, tokenOut] })
-      : rpc().readContract({ address: V3_FACTORY, abi: v3FactoryAbi, functionName: "getPool", args: [WETH, tokenOut, best.fee!] }),
+      ? rpc().readContract({
+          address: V2_FACTORY,
+          abi: v2FactoryAbi,
+          functionName: "getPair",
+          args: [WETH, tokenOut],
+        })
+      : rpc().readContract({
+          address: V3_FACTORY,
+          abi: v3FactoryAbi,
+          functionName: "getPool",
+          args: [WETH, tokenOut, best.fee!],
+        }),
     rpc().getBlockNumber(),
   ]);
   // Execution price vs. the near-spot price of a tiny trade on the same pool.
@@ -96,7 +139,11 @@ async function onchainQuote(token: TokenInfo, amountInWei: bigint): Promise<{ su
     },
     raw: {
       source: "onchain",
-      candidates: candidates.map((item) => ({ protocol: item.protocol, fee: item.fee ?? 3000, amountOut: item.out.toString() })),
+      candidates: candidates.map((item) => ({
+        protocol: item.protocol,
+        fee: item.fee ?? 3000,
+        amountOut: item.out.toString(),
+      })),
       reference: { amountIn: refIn.toString(), amountOut: refOut.toString() },
       pool,
       blockNumber: blockNumber.toString(),
@@ -104,7 +151,13 @@ async function onchainQuote(token: TokenInfo, amountInWei: bigint): Promise<{ su
   };
 }
 
-type TradingApiRoute = { type: string; address: string; fee?: string | number; tokenIn?: { symbol?: string }; tokenOut?: { symbol?: string } };
+type TradingApiRoute = {
+  type: string;
+  address: string;
+  fee?: string | number;
+  tokenIn?: { symbol?: string };
+  tokenOut?: { symbol?: string };
+};
 type TradingApiQuote = {
   routing: string;
   quote: {
@@ -119,10 +172,17 @@ type TradingApiQuote = {
   };
 };
 
-async function tradingApiQuote(token: TokenInfo, amountInWei: bigint): Promise<{ summary: QuoteSummary; raw: unknown }> {
+async function tradingApiQuote(
+  token: TokenInfo,
+  amountInWei: bigint,
+): Promise<{ summary: QuoteSummary; raw: unknown }> {
   const body = await fetchJson<TradingApiQuote>(`${config.uniswapUrl()}/quote`, {
     method: "POST",
-    headers: { "x-api-key": config.uniswapKey(), "Content-Type": "application/json", Accept: "application/json" },
+    headers: {
+      "x-api-key": config.uniswapKey(),
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
     body: JSON.stringify({
       type: "EXACT_INPUT",
       amount: amountInWei.toString(),
@@ -156,7 +216,7 @@ async function tradingApiQuote(token: TokenInfo, amountInWei: bigint): Promise<{
       priceImpactPct: typeof quote.priceImpact === "number" ? quote.priceImpact : null,
       route: pools.length
         ? `ETH → ${token.symbol} via Uniswap ${pools.map((pool) => `${pool.protocol}${pool.fee !== undefined ? ` ${(pool.fee / 10000).toFixed(2)}%` : ""}`).join(" + ")}`
-        : quote.routeString ?? body.routing,
+        : (quote.routeString ?? body.routing),
       pools,
       gasFeeUsd: quote.gasFeeUSD,
       blockNumber: quote.blockNumber,
@@ -166,5 +226,7 @@ async function tradingApiQuote(token: TokenInfo, amountInWei: bigint): Promise<{
 }
 
 export async function quoteEthToToken(token: TokenInfo, amountInWei: bigint) {
-  return config.uniswapKey() ? tradingApiQuote(token, amountInWei) : onchainQuote(token, amountInWei);
+  return config.uniswapKey()
+    ? tradingApiQuote(token, amountInWei)
+    : onchainQuote(token, amountInWei);
 }

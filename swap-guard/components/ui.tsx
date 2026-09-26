@@ -30,7 +30,16 @@ export type IconName = keyof typeof PATHS;
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
   return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
       {PATHS[name]}
     </svg>
   );
@@ -39,8 +48,21 @@ export function Icon({ name, className }: { name: IconName; className?: string }
 export function Glyph() {
   // A feather over a baseline: Ma'at's emblem, drawn for this app.
   return (
-    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="brand-glyph" aria-hidden="true">
-      <path d="M23.5 3.5C15 5 9.8 12 9.4 20.5l-.4 4.3c3.9-2.3 9.3-6.6 12.4-11.4 2.6-4 3.1-7.2 2.1-9.9z" fill="currentColor" fillOpacity=".18" />
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="brand-glyph"
+      aria-hidden="true"
+    >
+      <path
+        d="M23.5 3.5C15 5 9.8 12 9.4 20.5l-.4 4.3c3.9-2.3 9.3-6.6 12.4-11.4 2.6-4 3.1-7.2 2.1-9.9z"
+        fill="currentColor"
+        fillOpacity=".18"
+      />
       <path d="M7 29.5l14.5-21M13.2 17.5l4.3.6M15.4 14.2l4 .3M11.4 21l4.2 1" />
     </svg>
   );
@@ -48,10 +70,28 @@ export function Glyph() {
 
 export const VERDICTS: Verdict[] = ["ALLOW", "ESCALATE", "BLOCK"];
 
-export const VERDICT_META: Record<Verdict, { label: string; cls: string; icon: IconName; caption: string }> = {
-  ALLOW: { label: "Allow", cls: "allow", icon: "allow", caption: "Would be signed. Mainnet is analysis only, so nothing was sent." },
-  ESCALATE: { label: "Escalate", cls: "escalate", icon: "human", caption: "Held for the owner to approve with World ID." },
-  BLOCK: { label: "Block", cls: "block", icon: "block", caption: "Dropped before signing. Nothing was signed." },
+export const VERDICT_META: Record<
+  Verdict,
+  { label: string; cls: string; icon: IconName; caption: string }
+> = {
+  ALLOW: {
+    label: "Allow",
+    cls: "allow",
+    icon: "allow",
+    caption: "Would be signed. Mainnet is analysis only, so nothing was sent.",
+  },
+  ESCALATE: {
+    label: "Escalate",
+    cls: "escalate",
+    icon: "human",
+    caption: "Held for the owner to approve with World ID.",
+  },
+  BLOCK: {
+    label: "Block",
+    cls: "block",
+    icon: "block",
+    caption: "Dropped before signing. Nothing was signed.",
+  },
 };
 
 export function VerdictChip({ verdict }: { verdict: Verdict }) {
@@ -64,7 +104,12 @@ export function VerdictChip({ verdict }: { verdict: Verdict }) {
   );
 }
 
-export const TIER_TEXT: Record<Tier, string> = { high: "High risk", medium: "Watch", low: "Clear", unknown: "Unknown" };
+export const TIER_TEXT: Record<Tier, string> = {
+  high: "High risk",
+  medium: "Watch",
+  low: "Clear",
+  unknown: "Unknown",
+};
 
 export function Ext({ href, children }: { href?: string; children: ReactNode }) {
   if (!href) return <>{children}</>;
@@ -75,11 +120,17 @@ export function Ext({ href, children }: { href?: string; children: ReactNode }) 
   );
 }
 
-export const short = (value: string) => (value.length > 14 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value);
+export const short = (value: string) =>
+  value.length > 14 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
 export const pct = (value: number, digits = 1) => `${(value * 100).toFixed(digits)}%`;
-export const signed = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}`;
-export const usd = (value: number) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export const ms = (value: number) => (value >= 10_000 ? `${(value / 1000).toFixed(1)} s` : `${Math.round(value).toLocaleString("en-US")} ms`);
+export const signed = (value: number) =>
+  `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}`;
+export const usd = (value: number) =>
+  `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const ms = (value: number) =>
+  value >= 10_000
+    ? `${(value / 1000).toFixed(1)} s`
+    : `${Math.round(value).toLocaleString("en-US")} ms`;
 export const txUrl = (hash: string) => `https://etherscan.io/tx/${hash}`;
 export const addressUrl = (address: string) => `https://etherscan.io/address/${address}`;
 
@@ -103,7 +154,17 @@ export function clock(iso: string) {
   return new Date(iso).toLocaleTimeString("en-GB", { hour12: false });
 }
 
-export function CardHead({ id, title, sub, children }: { id: string; title: string; sub?: ReactNode; children?: ReactNode }) {
+export function CardHead({
+  id,
+  title,
+  sub,
+  children,
+}: {
+  id: string;
+  title: string;
+  sub?: ReactNode;
+  children?: ReactNode;
+}) {
   return (
     <header className="card-head">
       <div>

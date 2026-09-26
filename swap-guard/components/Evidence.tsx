@@ -22,8 +22,12 @@ export function Evidence({ decision }: { decision: Decision }) {
   }
   const maxAbs = Math.max(0.5, ...signals.map((signal) => Math.abs(signal.weight)));
   const dom = maxAbs * 1.3;
-  const plus = signals.filter((signal) => signal.weight > 0).reduce((total, signal) => total + signal.weight, 0);
-  const minus = signals.filter((signal) => signal.weight < 0).reduce((total, signal) => total + signal.weight, 0);
+  const plus = signals
+    .filter((signal) => signal.weight > 0)
+    .reduce((total, signal) => total + signal.weight, 0);
+  const minus = signals
+    .filter((signal) => signal.weight < 0)
+    .reduce((total, signal) => total + signal.weight, 0);
   const net = plus + minus;
   const missing = [
     !decision.integrations.intercepta ? "Intercepta (no API key)" : null,
@@ -58,7 +62,9 @@ export function Evidence({ decision }: { decision: Decision }) {
                 <span className="ev-label">{signal.label}</span>
                 <span className="ev-detail">{signal.value}</span>
                 <span className="ev-meta">
-                  <span className={`tag${signal.source === "intercepta" ? " tag-brass" : ""}`}>{SOURCE_TEXT[signal.source]}</span>
+                  <span className={`tag${signal.source === "intercepta" ? " tag-brass" : ""}`}>
+                    {SOURCE_TEXT[signal.source]}
+                  </span>
                   {signal.evidenceUrl ? (
                     <Ext href={signal.evidenceUrl}>
                       <span className="muted">evidence ↗</span>
@@ -66,9 +72,24 @@ export function Evidence({ decision }: { decision: Decision }) {
                   ) : null}
                 </span>
               </div>
-              <div className="div-track" title={`${signed(signal.weight)} ${toBlock ? "toward block" : "toward allow"}`}>
-                {signal.weight !== 0 ? <span className={`div-bar ${toBlock ? "to-block" : "to-allow"}`} style={{ width: `${width}%` }} /> : null}
-                <span className="div-val" style={toBlock ? { left: `calc(${50 + width}% + 6px)` } : { right: `calc(${50 + width}% + 6px)` }}>
+              <div
+                className="div-track"
+                title={`${signed(signal.weight)} ${toBlock ? "toward block" : "toward allow"}`}
+              >
+                {signal.weight !== 0 ? (
+                  <span
+                    className={`div-bar ${toBlock ? "to-block" : "to-allow"}`}
+                    style={{ width: `${width}%` }}
+                  />
+                ) : null}
+                <span
+                  className="div-val"
+                  style={
+                    toBlock
+                      ? { left: `calc(${50 + width}% + 6px)` }
+                      : { right: `calc(${50 + width}% + 6px)` }
+                  }
+                >
                   {signal.weight === 0 ? "0.0" : signed(signal.weight)}
                 </span>
               </div>

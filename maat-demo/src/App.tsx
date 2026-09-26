@@ -26,7 +26,7 @@ export function App() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   function updateDraft(index: number, value: string) {
-    setDraftUrls((current) => current.map((url, urlIndex) => urlIndex === index ? value : url));
+    setDraftUrls((current) => current.map((url, urlIndex) => (urlIndex === index ? value : url)));
     setInvalidIndex(null);
   }
 
@@ -36,13 +36,17 @@ export function App() {
       setInvalidIndex(index);
       return;
     }
-    setLoadedUrls((current) => current.map((loaded, urlIndex) => urlIndex === index ? url : loaded));
+    setLoadedUrls((current) =>
+      current.map((loaded, urlIndex) => (urlIndex === index ? url : loaded)),
+    );
     setInvalidIndex(null);
   }
 
   function selectPreset(index: number, url: string) {
-    setDraftUrls((current) => current.map((draft, urlIndex) => urlIndex === index ? url : draft));
-    setLoadedUrls((current) => current.map((loaded, urlIndex) => urlIndex === index ? url : loaded));
+    setDraftUrls((current) => current.map((draft, urlIndex) => (urlIndex === index ? url : draft)));
+    setLoadedUrls((current) =>
+      current.map((loaded, urlIndex) => (urlIndex === index ? url : loaded)),
+    );
     setInvalidIndex(null);
     setOpenIndex(null);
   }
@@ -85,18 +89,40 @@ export function App() {
               />
               {openIndex === index && (
                 <div className="preset-menu" id={`presets-${index}`} aria-label="Preset URLs">
-                  {presets.filter((preset) => preset.url).map((preset) => (
-                    <button type="button" key={preset.name} onClick={() => selectPreset(index, preset.url)}>
-                      {preset.url}
-                    </button>
-                  ))}
+                  {presets
+                    .filter((preset) => preset.url)
+                    .map((preset) => (
+                      <button
+                        type="button"
+                        key={preset.name}
+                        onClick={() => selectPreset(index, preset.url)}
+                      >
+                        {preset.url}
+                      </button>
+                    ))}
                 </div>
               )}
             </div>
-            <a href={loadedUrls[index]} target="_blank" rel="noopener noreferrer" aria-label={`Open ${position.toLowerCase()} page in a new tab`} title="Open in a new tab">↗</a>
+            <a
+              href={loadedUrls[index]}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open ${position.toLowerCase()} page in a new tab`}
+              title="Open in a new tab"
+            >
+              ↗
+            </a>
           </div>
-          {invalidIndex === index && <span className="url-error" role="alert">Enter an HTTP or HTTPS URL.</span>}
-          <iframe title={`${position} page`} src={loadedUrls[index]} referrerPolicy="strict-origin-when-cross-origin" />
+          {invalidIndex === index && (
+            <span className="url-error" role="alert">
+              Enter an HTTP or HTTPS URL.
+            </span>
+          )}
+          <iframe
+            title={`${position} page`}
+            src={loadedUrls[index]}
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
         </section>
       ))}
     </main>

@@ -15,24 +15,46 @@ import { askJev } from "./jev";
 import { buildSignals, fallbackVerdict, formatDuration } from "./signals";
 import { recordDecision, spentTodayUsd } from "./store";
 import { ethUsdPrice, quoteEthToToken } from "./uniswap";
-import type { Decision, Forensics, InterceptaTokenResult, JevResult, QuoteSummary, Rule, Stage, StageKey, StreamEvent, SwapRequest, TokenInfo, Verdict } from "./types";
+import type {
+  Decision,
+  Forensics,
+  InterceptaTokenResult,
+  JevResult,
+  QuoteSummary,
+  Rule,
+  Stage,
+  StageKey,
+  StreamEvent,
+  SwapRequest,
+  TokenInfo,
+  Verdict,
+} from "./types";
 
 export class RequestError extends Error {}
 
 function validate(input: SwapRequest) {
   if (!input.agentId?.trim()) throw new RequestError("agentId is required.");
-  if (Number(input.chainId) !== MAINNET_CHAIN_ID) throw new RequestError("Only Ethereum mainnet (chainId 1) is supported.");
+  if (Number(input.chainId) !== MAINNET_CHAIN_ID)
+    throw new RequestError("Only Ethereum mainnet (chainId 1) is supported.");
   const tokenIn = (input.tokenIn ?? "").toLowerCase();
-  if (!["eth", NATIVE_ETH, WETH.toLowerCase()].includes(tokenIn)) throw new RequestError("tokenIn must be ETH (native or WETH).");
-  if (!isAddress(input.tokenOut ?? "")) throw new RequestError("tokenOut must be a token contract address.");
-  if (input.tokenOut.toLowerCase() === WETH.toLowerCase()) throw new RequestError("tokenOut must differ from tokenIn.");
+  if (!["eth", NATIVE_ETH, WETH.toLowerCase()].includes(tokenIn))
+    throw new RequestError("tokenIn must be ETH (native or WETH).");
+  if (!isAddress(input.tokenOut ?? ""))
+    throw new RequestError("tokenOut must be a token contract address.");
+  if (input.tokenOut.toLowerCase() === WETH.toLowerCase())
+    throw new RequestError("tokenOut must differ from tokenIn.");
   const amountIn = input.amountIn ? Number(input.amountIn) : NaN;
   const amountUsd = input.amountUsd !== undefined ? Number(input.amountUsd) : NaN;
-  if (!(amountIn > 0) && !(amountUsd > 0)) throw new RequestError("Provide amountIn (ETH) or amountUsd greater than zero.");
-  if (!["owner", "merchant", "social"].includes(input.source)) throw new RequestError("source must be owner, merchant, or social.");
+  if (!(amountIn > 0) && !(amountUsd > 0))
+    throw new RequestError("Provide amountIn (ETH) or amountUsd greater than zero.");
+  if (!["owner", "merchant", "social"].includes(input.source))
+    throw new RequestError("source must be owner, merchant, or social.");
 }
 
-export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent) => void = () => {}): Promise<Decision> {
+export async function analyzeSwap(
+  input: SwapRequest,
+  emit: (event: StreamEvent) => void = () => {},
+): Promise<Decision> {
   validate(input);
   const t0 = performance.now();
   const now = () => Math.round(performance.now() - t0);
@@ -42,7 +64,13 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
     const next: Stage =
       event === "start"
         ? { key, status: "running", start: now() }
-        : { key, status: event === "skipped" ? "skipped" : event, start: existing?.start ?? now(), end: now(), note };
+        : {
+            key,
+            status: event === "skipped" ? "skipped" : event,
+            start: existing?.start ?? now(),
+            end: now(),
+            note,
+          };
     stages.set(key, next);
     emit({ type: "stage", stage: next });
   };
@@ -63,7 +91,11 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
   if (!config.agents().includes(agentId) || config.frozenAgents().includes(agentId)) {
     verdict = "BLOCK";
     rule = "H1";
-    reasons.push(config.frozenAgents().includes(agentId) ? `Agent "${agentId}" is frozen.` : `Agent "${agentId}" is not registered.`);
+    reasons.push(
+      config.frozenAgents().includes(agentId)
+        ? `Agent "${agentId}" is frozen.`
+        : `Agent "${agentId}" is not registered.`,
+    );
   }
 
   let token: TokenInfo | undefined;
@@ -86,7 +118,9 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
       stage("price", "done", `${token.symbol} · ETH $${ethUsd.toFixed(2)}`);
     } catch (caught) {
       stage("price", "failed", errorMessage(caught));
-      throw new RequestError(`Could not read the token or the ETH price on mainnet: ${errorMessage(caught)}`);
+      throw new RequestError(
+        `Could not read the token or the ETH price on mainnet: ${errorMessage(caught)}`,
+      );
     }
     const amountWei = parseEther(amountEth.toFixed(18));
     const resolvedToken = token;
@@ -99,7 +133,11 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
           const result = await quoteEthToToken(resolvedToken, amountWei);
           quote = result.summary;
           quoteRaw = result.raw;
-          stage("quote", "done", quote.provider === "trading-api" ? "Trading API" : "on-chain quoter");
+          stage(
+            "quote",
+            "done",
+            quote.provider === "trading-api" ? "Trading API" : "on-chain quoter",
+          );
         } catch (caught) {
           quoteError = errorMessage(caught);
           quoteRaw = { error: quoteError };
@@ -115,7 +153,11 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
         stage("tokenScan", "start");
         tokenScan = await scanToken(tokenOut, rawIntercepta);
         timings.interceptaMs = tokenScan?.ms;
-        stage("tokenScan", tokenScan?.error ? "failed" : "done", tokenScan?.error ?? `${tokenScan?.tier} risk`);
+        stage(
+          "tokenScan",
+          tokenScan?.error ? "failed" : "done",
+          tokenScan?.error ?? `${tokenScan?.tier} risk`,
+        );
       })(),
       (async () => {
         try {
@@ -128,19 +170,31 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
     ]);
   }
 
-  const signals = verdict ? [] : buildSignals({ source: input.source, quote, maxPriceImpact: policy.maxPriceImpact, tokenScan, forensics });
+  const signals = verdict
+    ? []
+    : buildSignals({
+        source: input.source,
+        quote,
+        maxPriceImpact: policy.maxPriceImpact,
+        tokenScan,
+        forensics,
+      });
   const deployerScan = forensics?.fundingPath.find((node) => node.role === "deployer")?.intercepta;
 
   // H2–H5, in order.
   if (!verdict && tokenScan?.tier === "high") {
     verdict = "BLOCK";
     rule = "H2";
-    reasons.push(`Intercepta flags the token as high risk (${tokenScan.detectors.map((d) => d.code).join(", ") || tokenScan.category}).`);
+    reasons.push(
+      `Intercepta flags the token as high risk (${tokenScan.detectors.map((d) => d.code).join(", ") || tokenScan.category}).`,
+    );
   }
   if (!verdict && deployerScan?.tier === "high") {
     verdict = "BLOCK";
     rule = "H2";
-    reasons.push(`Intercepta flags the deployer as high risk (toxicScore ${deployerScan.toxicScore}).`);
+    reasons.push(
+      `Intercepta flags the deployer as high risk (toxicScore ${deployerScan.toxicScore}).`,
+    );
   }
   if (!verdict && (amountUsd > policy.hardCap || spentBeforeUsd + amountUsd > policy.dailyLimit)) {
     verdict = "BLOCK";
@@ -156,15 +210,24 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
     rule = "H4";
     reasons.push(`No Uniswap route could quote this swap${quoteError ? `: ${quoteError}` : "."}`);
   }
-  if (!verdict && quote && quote.priceImpactPct !== null && quote.priceImpactPct > policy.maxPriceImpact) {
+  if (
+    !verdict &&
+    quote &&
+    quote.priceImpactPct !== null &&
+    quote.priceImpactPct > policy.maxPriceImpact
+  ) {
     verdict = "BLOCK";
     rule = "H4";
-    reasons.push(`Price impact ${quote.priceImpactPct.toFixed(2)}% is over the ${policy.maxPriceImpact}% limit.`);
+    reasons.push(
+      `Price impact ${quote.priceImpactPct.toFixed(2)}% is over the ${policy.maxPriceImpact}% limit.`,
+    );
   }
   if (!verdict && amountUsd > policy.perTxLimit) {
     verdict = "ESCALATE";
     rule = "H5";
-    reasons.push(`$${amountUsd.toFixed(2)} is over the $${policy.perTxLimit} per-swap limit; the owner must approve.`);
+    reasons.push(
+      `$${amountUsd.toFixed(2)} is over the $${policy.perTxLimit} per-swap limit; the owner must approve.`,
+    );
   }
 
   // J / C / F.
@@ -180,7 +243,21 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
     stage("jev", "start");
     if (config.jevKey()) {
       try {
-        const answer = await askJev(jevState({ input, agentId, amountUsd, amountEth, token: token!, quote, tokenScan, forensics, signals, spentBeforeUsd }), jevTrace);
+        const answer = await askJev(
+          jevState({
+            input,
+            agentId,
+            amountUsd,
+            amountEth,
+            token: token!,
+            quote,
+            tokenScan,
+            forensics,
+            signals,
+            spentBeforeUsd,
+          }),
+          jevTrace,
+        );
         jev = answer.result;
         jevRaw = answer.raw;
         timings.jevMs = jev.latencyMs;
@@ -198,7 +275,9 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
       if (jev.confidence < policy.confidenceThreshold) {
         verdict = "ESCALATE";
         rule = "C";
-        reasons.push(`JEV said ${jev.verdict} at ${(jev.confidence * 100).toFixed(1)}% confidence, under the ${policy.confidenceThreshold * 100}% threshold; the owner decides.`);
+        reasons.push(
+          `JEV said ${jev.verdict} at ${(jev.confidence * 100).toFixed(1)}% confidence, under the ${policy.confidenceThreshold * 100}% threshold; the owner decides.`,
+        );
       } else {
         verdict = jev.verdict;
         reasons.push(`JEV: ${jev.verdict} at ${(jev.confidence * 100).toFixed(1)}% confidence.`);
@@ -209,7 +288,9 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
       verdict = fallback.verdict;
       fallbackNet = fallback.net;
       stage("jev", "failed", `fallback: ${jevError}`);
-      reasons.push(`JEV unavailable (${jevError}); fixed-weight fallback net ${fallback.net >= 0 ? "+" : ""}${fallback.net} → ${verdict}.`);
+      reasons.push(
+        `JEV unavailable (${jevError}); fixed-weight fallback net ${fallback.net >= 0 ? "+" : ""}${fallback.net} → ${verdict}.`,
+      );
     }
     reasons.push(...topReasons(signals, verdict));
   }
@@ -238,7 +319,12 @@ export async function analyzeSwap(input: SwapRequest, emit: (event: StreamEvent)
     },
     policy,
     timings,
-    raw: { intercepta: rawIntercepta, uniswapQuote: quoteRaw, jevRequest: jevTrace.request, jev: jevRaw },
+    raw: {
+      intercepta: rawIntercepta,
+      uniswapQuote: quoteRaw,
+      jevRequest: jevTrace.request,
+      jev: jevRaw,
+    },
     analysisOnly: true,
     stages: [],
     token,
@@ -286,7 +372,11 @@ function jevState(ctx: {
   const { forensics } = ctx;
   return {
     task: "Pre-signing check for an AI agent's Uniswap swap on Ethereum mainnet.",
-    policy_passed: { per_swap_limit_usd: POLICY.perTxLimit, daily_limit_usd: POLICY.dailyLimit, max_price_impact_pct: POLICY.maxPriceImpact },
+    policy_passed: {
+      per_swap_limit_usd: POLICY.perTxLimit,
+      daily_limit_usd: POLICY.dailyLimit,
+      max_price_impact_pct: POLICY.maxPriceImpact,
+    },
     intent: {
       agent: ctx.agentId,
       sell: `${ctx.amountEth} ETH ($${ctx.amountUsd.toFixed(2)})`,
@@ -295,9 +385,16 @@ function jevState(ctx: {
       instruction_text: ctx.input.instruction ?? "",
       purpose: ctx.input.purpose ?? "",
     },
-    uniswap: ctx.quote ? { price_impact_pct: ctx.quote.priceImpactPct, route: ctx.quote.route } : "no quote",
+    uniswap: ctx.quote
+      ? { price_impact_pct: ctx.quote.priceImpactPct, route: ctx.quote.route }
+      : "no quote",
     intercepta_token_scan: ctx.tokenScan
-      ? { risk_score: ctx.tokenScan.riskScore, risk_level: ctx.tokenScan.riskLevel, action: ctx.tokenScan.action, detectors: ctx.tokenScan.detectors }
+      ? {
+          risk_score: ctx.tokenScan.riskScore,
+          risk_level: ctx.tokenScan.riskLevel,
+          action: ctx.tokenScan.action,
+          detectors: ctx.tokenScan.detectors,
+        }
       : "not available",
     forensics: forensics
       ? {
@@ -306,19 +403,30 @@ function jevState(ctx: {
           deployer_prior_tokens: forensics.priorTokens.map((row) => ({
             symbol: row.symbol,
             deployer_moved_out_pct: row.movedOutPct,
-            first_move_after_launch: row.firstOutAfterSec === null ? null : formatDuration(row.firstOutAfterSec),
+            first_move_after_launch:
+              row.firstOutAfterSec === null ? null : formatDuration(row.firstOutAfterSec),
             dumped: row.devSold,
           })),
           funding_path: forensics.fundingPath.map((node) => ({
             role: node.role,
             label: node.label?.name ?? (node.label?.tags.join(", ") || null),
             blockscout_scam_flag: node.label?.isScam ?? null,
-            intercepta: node.intercepta ? { tier: node.intercepta.tier, toxic_score: node.intercepta.toxicScore, traits: node.intercepta.traits.map((t) => t.name) } : null,
+            intercepta: node.intercepta
+              ? {
+                  tier: node.intercepta.tier,
+                  toxic_score: node.intercepta.toxicScore,
+                  traits: node.intercepta.traits.map((t) => t.name),
+                }
+              : null,
             watchlist: node.watchlist?.label ?? null,
             funded_with_eth: node.edge?.valueEth ?? null,
           })),
         }
       : "forensics failed",
-    evidence: ctx.signals.map((signal) => ({ signal: signal.label, detail: signal.value, source: signal.source })),
+    evidence: ctx.signals.map((signal) => ({
+      signal: signal.label,
+      detail: signal.value,
+      source: signal.source,
+    })),
   };
 }

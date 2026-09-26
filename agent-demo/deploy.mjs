@@ -14,14 +14,20 @@ const localEnvPath = join(root, ".env");
 const caddyFile = join(root, "deploy/caddy/site.caddy");
 
 function parseEnv(text) {
-  return Object.fromEntries(text.split(/\r?\n/).flatMap((line) => {
-    const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-    return match ? [[match[1], match[2].replace(/^['"]|['"]$/g, "")]] : [];
-  }));
+  return Object.fromEntries(
+    text.split(/\r?\n/).flatMap((line) => {
+      const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+      return match ? [[match[1], match[2].replace(/^['"]|['"]$/g, "")]] : [];
+    }),
+  );
 }
 
 async function command(file, commandArgs, options = {}) {
-  const result = await run(file, commandArgs, { cwd: root, maxBuffer: 2 * 1024 * 1024, ...options });
+  const result = await run(file, commandArgs, {
+    cwd: root,
+    maxBuffer: 2 * 1024 * 1024,
+    ...options,
+  });
   if (result.stdout?.trim()) process.stdout.write(result.stdout);
   if (result.stderr?.trim()) process.stderr.write(result.stderr);
   return result;
@@ -29,23 +35,32 @@ async function command(file, commandArgs, options = {}) {
 
 async function main() {
   let env;
-  try { env = parseEnv(await readFile(localEnvPath, "utf8")); }
-  catch { throw new Error(`Missing ${localEnvPath}. Copy .env.example to .env before publishing.`); }
+  try {
+    env = parseEnv(await readFile(localEnvPath, "utf8"));
+  } catch {
+    throw new Error(`Missing ${localEnvPath}. Copy .env.example to .env before publishing.`);
+  }
   const host = env.DEPLOY_HOST;
   const domain = env.DEPLOY_DOMAIN;
   const appDir = env.REMOTE_APP_DIR || "/opt/maat-agent-demo";
   const port = Number(env.PORT ?? 8794);
   if (!host) throw new Error("Missing DEPLOY_HOST in .env.");
-  if (!/^[a-z0-9][a-z0-9._@-]*$/i.test(host)) throw new Error("DEPLOY_HOST must be an SSH host or user@host.");
-  if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error("DEPLOY_DOMAIN must be a hostname.");
-  if (!/^\/[a-zA-Z0-9/_-]+$/.test(appDir)) throw new Error("REMOTE_APP_DIR must be an absolute path without shell characters.");
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("PORT must be a valid user-space port.");
+  if (!/^[a-z0-9][a-z0-9._@-]*$/i.test(host))
+    throw new Error("DEPLOY_HOST must be an SSH host or user@host.");
+  if (!domain || !/^[a-z0-9.-]+$/i.test(domain))
+    throw new Error("DEPLOY_DOMAIN must be a hostname.");
+  if (!/^\/[a-zA-Z0-9/_-]+$/.test(appDir))
+    throw new Error("REMOTE_APP_DIR must be an absolute path without shell characters.");
+  if (!Number.isInteger(port) || port < 1024 || port > 65535)
+    throw new Error("PORT must be a valid user-space port.");
   for (const name of ["GATEWAY_BASIC_USER", "GATEWAY_BASIC_PASSWORD", "MERCHANT_BASE_URL"]) {
     if (!env[name]) throw new Error(`Missing ${name} in .env.`);
   }
   const caddyConfig = await readFile(caddyFile, "utf8");
-  if (!caddyConfig.trimStart().startsWith(`${domain} {`)) throw new Error("deploy/caddy/site.caddy must use DEPLOY_DOMAIN as its site address.");
-  if (!caddyConfig.includes(`reverse_proxy 127.0.0.1:${port}`)) throw new Error("deploy/caddy/site.caddy must proxy to PORT.");
+  if (!caddyConfig.trimStart().startsWith(`${domain} {`))
+    throw new Error("deploy/caddy/site.caddy must use DEPLOY_DOMAIN as its site address.");
+  if (!caddyConfig.includes(`reverse_proxy 127.0.0.1:${port}`))
+    throw new Error("deploy/caddy/site.caddy must proxy to PORT.");
   if (args.has("--validate")) {
     await command("npm", ["run", "typecheck"]);
     await command("npm", ["run", "build"]);
@@ -64,7 +79,14 @@ mkdir -p "$APP_DIR/dist" "$APP_DIR/src" "$BACKUP_DIR" /etc/caddy/backups
 if [ -f /etc/caddy/sites/$DOMAIN.caddy ]; then cp /etc/caddy/sites/$DOMAIN.caddy "$BACKUP_DIR/$DOMAIN.caddy"; fi
 `);
   await command("rsync", ["-az", "--delete", `${join(root, "dist")}/`, `${host}:${appDir}/dist/`]);
-  await command("rsync", ["-az", "server.ts", "package.json", "package-lock.json", "ecosystem.config.cjs", `${host}:${appDir}/`]);
+  await command("rsync", [
+    "-az",
+    "server.ts",
+    "package.json",
+    "package-lock.json",
+    "ecosystem.config.cjs",
+    `${host}:${appDir}/`,
+  ]);
   await command("rsync", ["-az", "src/scenarios.ts", `${host}:${appDir}/src/`]);
   await command("rsync", ["-az", ".env", `${host}:${appDir}/.env`]);
   await command("rsync", ["-az", caddyFile, `${host}:/etc/caddy/sites/${domain}.caddy`]);
@@ -91,4 +113,7 @@ echo 'remote Agent site is ready'
   console.log(`Published https://${domain}`);
 }
 
-main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});

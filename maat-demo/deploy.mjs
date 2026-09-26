@@ -17,9 +17,12 @@ async function command(file, args) {
   if (stderr) process.stderr.write(stderr);
 }
 
-if (!host || !/^[a-z0-9][a-z0-9._@-]*$/i.test(host)) throw new Error("DEPLOY_HOST must be an SSH host.");
-if (!domain || !/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(domain)) throw new Error("DEPLOY_DOMAIN must be a hostname.");
-if (!appDir || !/^\/[a-zA-Z0-9/_-]+$/.test(appDir)) throw new Error("REMOTE_APP_DIR must be an absolute app path.");
+if (!host || !/^[a-z0-9][a-z0-9._@-]*$/i.test(host))
+  throw new Error("DEPLOY_HOST must be an SSH host.");
+if (!domain || !/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(domain))
+  throw new Error("DEPLOY_DOMAIN must be a hostname.");
+if (!appDir || !/^\/[a-zA-Z0-9/_-]+$/.test(appDir))
+  throw new Error("REMOTE_APP_DIR must be an absolute app path.");
 
 const template = await readFile(join(root, "deploy/caddy/site.caddy.template"), "utf8");
 const site = template.replaceAll("__DOMAIN__", domain).replaceAll("__APP_DIR__", appDir);
@@ -29,8 +32,18 @@ try {
   await writeFile(join(temporary, "site.caddy"), site);
   await command("npm", ["run", "build"]);
   await command("ssh", [host, `mkdir -p '${appDir}/.incoming/dist' '${appDir}/.deploy-backups'`]);
-  await command("rsync", ["-az", "--delete", `${join(root, "dist")}/`, `${host}:${appDir}/.incoming/dist/`]);
-  await command("rsync", ["-az", join(temporary, "site.caddy"), join(root, "deploy/activate.sh"), `${host}:${appDir}/.incoming/`]);
+  await command("rsync", [
+    "-az",
+    "--delete",
+    `${join(root, "dist")}/`,
+    `${host}:${appDir}/.incoming/dist/`,
+  ]);
+  await command("rsync", [
+    "-az",
+    join(temporary, "site.caddy"),
+    join(root, "deploy/activate.sh"),
+    `${host}:${appDir}/.incoming/`,
+  ]);
   await command("ssh", [host, `sh '${appDir}/.incoming/activate.sh' '${appDir}' '${domain}'`]);
 } finally {
   await rm(temporary, { recursive: true, force: true });

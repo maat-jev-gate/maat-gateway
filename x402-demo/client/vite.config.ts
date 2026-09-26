@@ -8,7 +8,7 @@ export default defineConfig({
     proxy: {
       "/merchant": "http://127.0.0.1:8790",
       "/health": "http://127.0.0.1:8790",
-      "/api": "http://127.0.0.1:8790"
-    }
-  }
+      "/api": "http://127.0.0.1:8790",
+    },
+  },
 });

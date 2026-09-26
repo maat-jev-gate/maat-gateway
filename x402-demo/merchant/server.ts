@@ -10,7 +10,10 @@ config();
 const port = Number(process.env.PORT ?? 8790);
 const network = "eip155:84532";
 const asset = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
-const facilitatorUrl = (process.env.FACILITATOR_URL ?? "https://x402.org/facilitator").replace(/\/$/, "");
+const facilitatorUrl = (process.env.FACILITATOR_URL ?? "https://x402.org/facilitator").replace(
+  /\/$/,
+  "",
+);
 const payTo = process.env.MERCHANT_PAY_TO?.trim() ?? "";
 const verifyPayTo = process.env.MERCHANT_VERIFY_PAY_TO?.trim() || payTo;
 const riskPayTo = process.env.MERCHANT_RISK_PAY_TO?.trim() ?? "";
@@ -44,7 +47,7 @@ const products: Record<string, Product> = {
     priceUsd: "0.001",
     amount: "1000",
     description: "Atlas dataset access",
-    contentType: "application/json"
+    contentType: "application/json",
   },
   verifyAccount: {
     id: "verify-account",
@@ -53,7 +56,7 @@ const products: Record<string, Product> = {
     priceUsd: "80.00",
     amount: "80000000",
     description: "Account verification fee",
-    contentType: "application/json"
+    contentType: "application/json",
   },
   riskCheck: {
     id: "risk-check",
@@ -62,8 +65,8 @@ const products: Record<string, Product> = {
     priceUsd: "0.001",
     amount: "1000",
     description: "Risk-screened dataset access",
-    contentType: "application/json"
-  }
+    contentType: "application/json",
+  },
 };
 
 const app = Fastify({ logger: true });
@@ -109,7 +112,8 @@ function encodeBase64Json(value: unknown): string {
 }
 
 function requirements(product: Product): PaymentRequirements {
-  if (!/^0x[\da-f]{40}$/i.test(product.recipient)) throw new Error("Merchant payment recipient is not configured with a valid address.");
+  if (!/^0x[\da-f]{40}$/i.test(product.recipient))
+    throw new Error("Merchant payment recipient is not configured with a valid address.");
   return {
     scheme: "exact",
     network,
@@ -117,7 +121,7 @@ function requirements(product: Product): PaymentRequirements {
     amount: product.amount,
     payTo: product.recipient,
     maxTimeoutSeconds: 300,
-    extra: { name: "USDC", version: "2" }
+    extra: { name: "USDC", version: "2" },
   };
 }
 
@@ -135,7 +139,10 @@ function paymentSignature(request: FastifyRequest): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-async function settlePayment(request: FastifyRequest, product: Product): Promise<{ txHash?: string; demo: boolean }> {
+async function settlePayment(
+  request: FastifyRequest,
+  product: Product,
+): Promise<{ txHash?: string; demo: boolean }> {
   const signature = paymentSignature(request);
   if (!signature) {
     if (allowUnsignedPayment) return { demo: true };
@@ -144,23 +151,47 @@ async function settlePayment(request: FastifyRequest, product: Product): Promise
 
   const req = requirements(product);
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (process.env.FACILITATOR_AUTH_TOKEN) headers.authorization = `Bearer ${process.env.FACILITATOR_AUTH_TOKEN}`;
+  if (process.env.FACILITATOR_AUTH_TOKEN)
+    headers.authorization = `Bearer ${process.env.FACILITATOR_AUTH_TOKEN}`;
 
   const verify = await fetch(`${facilitatorUrl}/verify`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ x402Version: 2, paymentPayload: decodePayment(signature), paymentRequirements: req })
+    body: JSON.stringify({
+      x402Version: 2,
+      paymentPayload: decodePayment(signature),
+      paymentRequirements: req,
+    }),
   });
-  const verification = await verify.json().catch(() => ({})) as { isValid?: boolean; invalidReason?: string; invalidMessage?: string };
-  if (!verify.ok || verification.isValid !== true) throw new Error(`Payment verification failed: ${verification.invalidReason ?? verify.status}${verification.invalidMessage ? ` (${verification.invalidMessage})` : ""}`);
+  const verification = (await verify.json().catch(() => ({}))) as {
+    isValid?: boolean;
+    invalidReason?: string;
+    invalidMessage?: string;
+  };
+  if (!verify.ok || verification.isValid !== true)
+    throw new Error(
+      `Payment verification failed: ${verification.invalidReason ?? verify.status}${verification.invalidMessage ? ` (${verification.invalidMessage})` : ""}`,
+    );
 
   const settle = await fetch(`${facilitatorUrl}/settle`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ x402Version: 2, paymentPayload: decodePayment(signature), paymentRequirements: req })
+    body: JSON.stringify({
+      x402Version: 2,
+      paymentPayload: decodePayment(signature),
+      paymentRequirements: req,
+    }),
   });
-  const result = await settle.json().catch(() => ({})) as { success?: boolean; txHash?: string; errorReason?: string; errorMessage?: string };
-  if (!settle.ok || result.success !== true) throw new Error(`Payment settlement failed: ${result.errorReason ?? settle.status}${result.errorMessage ? ` (${result.errorMessage})` : ""}`);
+  const result = (await settle.json().catch(() => ({}))) as {
+    success?: boolean;
+    txHash?: string;
+    errorReason?: string;
+    errorMessage?: string;
+  };
+  if (!settle.ok || result.success !== true)
+    throw new Error(
+      `Payment settlement failed: ${result.errorReason ?? settle.status}${result.errorMessage ? ` (${result.errorMessage})` : ""}`,
+    );
   return { txHash: result.txHash, demo: false };
 }
 
@@ -184,34 +215,86 @@ function payerFromPayment(signature: string | undefined): string | undefined {
 
 class PaymentRequiredError extends Error {}
 
-async function paidResponse(request: FastifyRequest, reply: FastifyReply, product: Product, data: unknown) {
+async function paidResponse(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  product: Product,
+  data: unknown,
+) {
   try {
     const settlement = await settlePayment(request, product);
-    addEvent({ method: request.method, path: request.url, status: 200, product: product.id, amount: product.priceUsd, payer: payerFromPayment(paymentSignature(request)), txHash: settlement.txHash, demo: settlement.demo, message: settlement.demo ? "Demo response without settlement" : "Payment settled" });
-    return reply.send({ ...data as object, payment: { network, amount: product.amount, txHash: settlement.txHash, demo: settlement.demo } });
+    addEvent({
+      method: request.method,
+      path: request.url,
+      status: 200,
+      product: product.id,
+      amount: product.priceUsd,
+      payer: payerFromPayment(paymentSignature(request)),
+      txHash: settlement.txHash,
+      demo: settlement.demo,
+      message: settlement.demo ? "Demo response without settlement" : "Payment settled",
+    });
+    return reply.send({
+      ...(data as object),
+      payment: {
+        network,
+        amount: product.amount,
+        txHash: settlement.txHash,
+        demo: settlement.demo,
+      },
+    });
   } catch (error) {
     if (error instanceof PaymentRequiredError) {
-      addEvent({ method: request.method, path: request.url, status: 402, product: product.id, amount: product.priceUsd, demo: false, message: "Payment required" });
+      addEvent({
+        method: request.method,
+        path: request.url,
+        status: 402,
+        product: product.id,
+        amount: product.priceUsd,
+        demo: false,
+        message: "Payment required",
+      });
       return sendPaymentRequired(reply, product);
     }
     const message = error instanceof Error ? error.message : "Payment processing failed";
-    addEvent({ method: request.method, path: request.url, status: 402, product: product.id, amount: product.priceUsd, payer: payerFromPayment(paymentSignature(request)), demo: false, message });
+    addEvent({
+      method: request.method,
+      path: request.url,
+      status: 402,
+      product: product.id,
+      amount: product.priceUsd,
+      payer: payerFromPayment(paymentSignature(request)),
+      demo: false,
+      message,
+    });
     return reply.code(402).send({ error: message });
   }
 }
 
 app.register(fastifyStatic, { root: join(fileURLToPath(new URL(".", import.meta.url)), "public") });
 
-app.get("/health", async () => ({ ok: true, service: "maat-x402-merchant", network, configured: Boolean(payTo) }));
+app.get("/health", async () => ({
+  ok: true,
+  service: "maat-x402-merchant",
+  network,
+  configured: Boolean(payTo),
+}));
 app.get("/api/merchant/events", async () => ({
   events,
-  merchants: Object.values(products).map(({ id, merchantName, recipient, priceUsd }) => ({ id, name: merchantName, payTo: recipient, priceUsd })),
+  merchants: Object.values(products).map(({ id, merchantName, recipient, priceUsd }) => ({
+    id,
+    name: merchantName,
+    payTo: recipient,
+    priceUsd,
+  })),
   network,
-  asset
+  asset,
 }));
 app.delete("/api/merchant/history", async (request, reply) => {
-  if (request.headers["x-clear-history"] !== "confirmed") return reply.code(400).send({ error: "Clear confirmation is required." });
-  if (!request.headers.origin || new URL(request.headers.origin).host !== request.headers.host) return reply.code(403).send({ error: "Same-origin request required." });
+  if (request.headers["x-clear-history"] !== "confirmed")
+    return reply.code(400).send({ error: "Clear confirmation is required." });
+  if (!request.headers.origin || new URL(request.headers.origin).host !== request.headers.host)
+    return reply.code(403).send({ error: "Same-origin request required." });
   events.length = 0;
   saveEvents();
   return { cleared: true };
@@ -222,18 +305,28 @@ app.get<{ Params: { id: string } }>("/merchant/dataset/:id", async (request, rep
   return paidResponse(request, reply, product, {
     id: request.params.id,
     title: "Atlas dataset",
-    rows: [{ key: "alpha", value: "settled" }, { key: "beta", value: "verified" }]
+    rows: [
+      { key: "alpha", value: "settled" },
+      { key: "beta", value: "verified" },
+    ],
   });
 });
 
 app.post("/merchant/verify-account", async (request, reply) => {
   const product = products.verifyAccount;
-  return paidResponse(request, reply, product, { status: "verified", account: "atlas-demo-account" });
+  return paidResponse(request, reply, product, {
+    status: "verified",
+    account: "atlas-demo-account",
+  });
 });
 
 app.get("/merchant/risk-check", async (request, reply) => {
   if (!riskPayTo) return reply.code(503).send({ error: "MERCHANT_RISK_PAY_TO is not configured." });
-  return paidResponse(request, reply, products.riskCheck, { id: "risk-check", title: "Atlas dataset", rows: [] });
+  return paidResponse(request, reply, products.riskCheck, {
+    id: "risk-check",
+    title: "Atlas dataset",
+    rows: [],
+  });
 });
 
 app.setErrorHandler((error, _request, reply) => {

@@ -81,9 +81,9 @@ Other routes:
    - Uniswap quote for the exact size
    - Intercepta Scan Token
    - Deployer forensics (below), which includes an Intercepta Quick Scan of the deployer and each funder
-2. **Hard rules, in fixed order** ([lib/engine.ts:62](lib/engine.ts#L62), [lib/engine.ts:134](lib/engine.ts#L134)):
+2. **Hard rules, in fixed order** ([lib/engine.ts:90](lib/engine.ts#L90), [lib/engine.ts:184](lib/engine.ts#L184)):
    H1 agent registered → H2 Intercepta high risk on token or deployer → H3 hard cap / daily limit → H4 price impact > 3% (or no route) → H5 over $10 per swap → escalate.
-3. **JEV** judges the rest ([lib/engine.ts:170](lib/engine.ts#L170)). If JEV's confidence is below 0.80 → `ESCALATE` (rule C). If JEV times out or has no key, the fixed-weight fallback decides and the page labels it `fallback` (F): net ≥ +1.5 blocks, ≤ −0.5 allows, otherwise escalates.
+3. **JEV** judges the rest ([lib/engine.ts:233](lib/engine.ts#L233)). If JEV's confidence is below 0.80 → `ESCALATE` (rule C). If JEV times out or has no key, the fixed-weight fallback decides and the page labels it `fallback` (F): net ≥ +1.5 blocks, ≤ −0.5 allows, otherwise escalates.
 
 Policy (from the plan): $10 per swap, $50 per day, $200 hard cap, 3% price impact, 0.80 confidence, 1.5 s JEV timeout.
 
@@ -91,10 +91,10 @@ Policy (from the plan): $10 per swap, $50 per day, $200 hard cap, 3% price impac
 
 All computed per request ([lib/forensics.ts](lib/forensics.ts)):
 
-- **Real deployer** ([lib/forensics.ts:37](lib/forensics.ts#L37)): the signer of the token's creation transaction. If a factory or launchpad contract created the token, it is recorded as the factory and the signer is followed instead.
-- **Other tokens** ([lib/forensics.ts:80](lib/forensics.ts#L80)): contracts the deployer deployed directly, tokens minted by the deployer's other calls to the same factory function (read from the receipts' `Transfer(from = 0x0)` logs), and tokens minted to the deployer. The last group is only accepted after checking that the deployer signed the token's creation ([lib/forensics.ts:65](lib/forensics.ts#L65)). Spam tokens mint themselves to well-known wallets and emit fake transfers, and without this check PEPE's deployer showed as a serial dumper. LP tokens are excluded. Up to 8 ERC-20s, newest first.
-- **Dev dumps** ([lib/forensics.ts:152](lib/forensics.ts#L152)): for each of those tokens, how much of what the deployer received left its wallet (sold or transferred), how much within 24 h, and how soon after launch. "Dumped" means ≥ 50% out within 7 days.
-- **Funding path** ([lib/forensics.ts:209](lib/forensics.ts#L209)): the deployer's earliest incoming ETH (normal or internal transfer) before launch, then that funder's earliest incoming ETH. Tracing stops at contracts, labeled wallets, and wallets with more than 5,000 outgoing transactions (exchange hot wallets). Every address is checked against Intercepta Quick Scan, Blockscout's scam flag, and `data/watchlist.json`.
+- **Real deployer** ([lib/forensics.ts:48](lib/forensics.ts#L48)): the signer of the token's creation transaction. If a factory or launchpad contract created the token, it is recorded as the factory and the signer is followed instead.
+- **Other tokens** ([lib/forensics.ts:98](lib/forensics.ts#L98)): contracts the deployer deployed directly, tokens minted by the deployer's other calls to the same factory function (read from the receipts' `Transfer(from = 0x0)` logs), and tokens minted to the deployer. The last group is only accepted after checking that the deployer signed the token's creation ([lib/forensics.ts:65](lib/forensics.ts#L65)). Spam tokens mint themselves to well-known wallets and emit fake transfers, and without this check PEPE's deployer showed as a serial dumper. LP tokens are excluded. Up to 8 ERC-20s, newest first.
+- **Dev dumps** ([lib/forensics.ts:213](lib/forensics.ts#L213)): for each of those tokens, how much of what the deployer received left its wallet (sold or transferred), how much within 24 h, and how soon after launch. "Dumped" means ≥ 50% out within 7 days.
+- **Funding path** ([lib/forensics.ts:320](lib/forensics.ts#L320)): the deployer's earliest incoming ETH (normal or internal transfer) before launch, then that funder's earliest incoming ETH. Tracing stops at contracts, labeled wallets, and wallets with more than 5,000 outgoing transactions (exchange hot wallets). Every address is checked against Intercepta Quick Scan, Blockscout's scam flag, and `data/watchlist.json`.
 - **Token age**: from the creation block.
 
 A lookup that fails is shown as failed. It never turns into a clean result.
@@ -115,15 +115,15 @@ Tested on 2026-09-26 against live mainnet: PEPE and UNI (no other launches, exch
 
 | Integration | File |
 | --- | --- |
-| Uniswap Trading API `/quote` | [lib/uniswap.ts:122](lib/uniswap.ts#L122) |
-| Uniswap on-chain quote (v2 Router, v3 QuoterV2) | [lib/uniswap.ts:54](lib/uniswap.ts#L54) |
-| ETH price from the v3 WETH/USDC pool | [lib/uniswap.ts:47](lib/uniswap.ts#L47) |
-| Intercepta Scan Token | [lib/intercepta.ts:79](lib/intercepta.ts#L79) |
-| Intercepta Quick Scan Address | [lib/intercepta.ts:58](lib/intercepta.ts#L58) |
-| Intercepta tier mapping | [lib/intercepta.ts:46](lib/intercepta.ts#L46) |
-| JEV call | [lib/jev.ts:26](lib/jev.ts#L26) |
-| Rules and pipeline | [lib/engine.ts:35](lib/engine.ts#L35) |
-| Signal weights and fallback | [lib/signals.ts:22](lib/signals.ts#L22), [lib/signals.ts:157](lib/signals.ts#L157) |
+| Uniswap Trading API `/quote` | [lib/uniswap.ts:175](lib/uniswap.ts#L175) |
+| Uniswap on-chain quote (v2 Router, v3 QuoterV2) | [lib/uniswap.ts:73](lib/uniswap.ts#L73) |
+| ETH price from the v3 WETH/USDC pool | [lib/uniswap.ts:61](lib/uniswap.ts#L61) |
+| Intercepta Scan Token | [lib/intercepta.ts:108](lib/intercepta.ts#L108) |
+| Intercepta Quick Scan Address | [lib/intercepta.ts:72](lib/intercepta.ts#L72) |
+| Intercepta tier mapping | [lib/intercepta.ts:50](lib/intercepta.ts#L50) |
+| JEV call | [lib/jev.ts:39](lib/jev.ts#L39) |
+| Rules and pipeline | [lib/engine.ts:54](lib/engine.ts#L54) |
+| Signal weights and fallback | [lib/signals.ts:29](lib/signals.ts#L29), [lib/signals.ts:270](lib/signals.ts#L270) |
 
 ### Intercepta tier mapping
 

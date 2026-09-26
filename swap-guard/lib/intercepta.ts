@@ -19,7 +19,10 @@ const CACHE_MS = 10 * 60 * 1000;
 const cache = new Map<string, { at: number; value: unknown }>();
 const HIGH_TRAITS = new Set(["sanction_address", "known_scammer", "blacklist", "rug_pull"]);
 
-type QuickScan = { toxicScore: number; traits: { name: string; risk: number; description: string; txsCount?: number }[] };
+type QuickScan = {
+  toxicScore: number;
+  traits: { name: string; risk: number; description: string; txsCount?: number }[];
+};
 type TokenRisks = {
   riskScore: number;
   riskLevel: string;
@@ -34,7 +37,8 @@ type TokenRisks = {
 async function get<T>(path: string): Promise<{ body: T; cached: boolean }> {
   const useCache = config.interceptaCache();
   const hit = cache.get(path);
-  if (useCache && hit && Date.now() - hit.at < CACHE_MS) return { body: hit.value as T, cached: true };
+  if (useCache && hit && Date.now() - hit.at < CACHE_MS)
+    return { body: hit.value as T, cached: true };
   const body = await fetchJson<T>(`${config.interceptaUrl()}${path}`, {
     headers: { "X-API-KEY": config.interceptaKey(), Accept: "application/json" },
     timeoutMs: config.interceptaTimeoutMs(),
@@ -44,18 +48,31 @@ async function get<T>(path: string): Promise<{ body: T; cached: boolean }> {
 }
 
 export function addressTier(scan: QuickScan): Tier {
-  if (scan.toxicScore >= 80 || scan.traits.some((trait) => HIGH_TRAITS.has(trait.name) && trait.risk >= 50)) return "high";
+  if (
+    scan.toxicScore >= 80 ||
+    scan.traits.some((trait) => HIGH_TRAITS.has(trait.name) && trait.risk >= 50)
+  )
+    return "high";
   if (scan.toxicScore >= 40) return "medium";
   return "low";
 }
 
 export function tokenTier(risks: TokenRisks): Tier {
-  if (risks.action === "block" || risks.riskLevel === "high" || risks.category === "malicious" || risks.category === "sanctioned") return "high";
+  if (
+    risks.action === "block" ||
+    risks.riskLevel === "high" ||
+    risks.category === "malicious" ||
+    risks.category === "sanctioned"
+  )
+    return "high";
   if (risks.action === "warn" || risks.riskLevel === "medium") return "medium";
   return "low";
 }
 
-export async function quickScanAddress(address: string, raw: unknown[]): Promise<InterceptaAddressResult | undefined> {
+export async function quickScanAddress(
+  address: string,
+  raw: unknown[],
+): Promise<InterceptaAddressResult | undefined> {
   if (!config.interceptaKey()) return undefined;
   const startedAt = performance.now();
   const path = `/api/public/v2/extension/account/${address.toLowerCase()}/quick-scan`;
@@ -66,17 +83,32 @@ export async function quickScanAddress(address: string, raw: unknown[]): Promise
       address,
       tier: addressTier(body),
       toxicScore: body.toxicScore,
-      traits: (body.traits ?? []).map(({ name, risk, description }) => ({ name, risk, description })),
+      traits: (body.traits ?? []).map(({ name, risk, description }) => ({
+        name,
+        risk,
+        description,
+      })),
       ms: Math.round(performance.now() - startedAt),
       cached,
     };
   } catch (caught) {
     raw.push({ request: { method: "GET", path }, error: errorMessage(caught) });
-    return { address, tier: "unknown", toxicScore: null, traits: [], ms: Math.round(performance.now() - startedAt), cached: false, error: errorMessage(caught) };
+    return {
+      address,
+      tier: "unknown",
+      toxicScore: null,
+      traits: [],
+      ms: Math.round(performance.now() - startedAt),
+      cached: false,
+      error: errorMessage(caught),
+    };
   }
 }
 
-export async function scanToken(address: string, raw: unknown[]): Promise<InterceptaTokenResult | undefined> {
+export async function scanToken(
+  address: string,
+  raw: unknown[],
+): Promise<InterceptaTokenResult | undefined> {
   if (!config.interceptaKey()) return undefined;
   const startedAt = performance.now();
   const path = `/api/public/v2/extension/token-intelligence/token/${address.toLowerCase()}/risks?chainId=1`;
@@ -98,6 +130,13 @@ export async function scanToken(address: string, raw: unknown[]): Promise<Interc
     };
   } catch (caught) {
     raw.push({ request: { method: "GET", path }, error: errorMessage(caught) });
-    return { tier: "unknown", riskScore: null, detectors: [], ms: Math.round(performance.now() - startedAt), cached: false, error: errorMessage(caught) };
+    return {
+      tier: "unknown",
+      riskScore: null,
+      detectors: [],
+      ms: Math.round(performance.now() - startedAt),
+      cached: false,
+      error: errorMessage(caught),
+    };
   }
 }

@@ -8,7 +8,10 @@ import type { WatchlistHit } from "./types";
 type Entry = { address: string; label: string; source: string };
 
 const index = new Map<string, WatchlistHit>(
-  (entries as Entry[]).map((entry) => [entry.address.toLowerCase(), { address: entry.address, label: entry.label, source: entry.source }]),
+  (entries as Entry[]).map((entry) => [
+    entry.address.toLowerCase(),
+    { address: entry.address, label: entry.label, source: entry.source },
+  ]),
 );
 
 export function watchlistHit(address: string): WatchlistHit | undefined {
