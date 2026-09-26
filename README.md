@@ -72,4 +72,4 @@ npm install
 npm run deploy
 ```
 
-The script builds and type-checks the Gateway locally, syncs the build and server files to `/opt/maat-gateway`, installs production dependencies, reloads the `maat-gateway` PM2 process, updates the Caddy site for `gateway.maat-jev-gate.online`, and verifies `/health` on the remote host.
+The script builds and type-checks the Gateway locally, syncs the build, server files, `.env`, and `deploy/caddy/site.caddy` to `/opt/maat-gateway` and the Caddy site directory, installs production dependencies, reloads the `maat-gateway` PM2 process, and verifies `/health` on the remote host.

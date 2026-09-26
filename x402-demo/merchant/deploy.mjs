@@ -1,15 +1,14 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const root = dirname(fileURLToPath(import.meta.url));
 const appDir = "/opt/maat-x402-merchant";
 const service = "maat-x402-merchant";
-const caddyTemplate = join(root, "deploy/caddy/merchant.caddy.template");
+const caddyFile = join(root, "deploy/caddy/site.caddy");
 
 function parseEnv(text) {
   return Object.fromEntries(text.split(/\r?\n/).flatMap((line) => {
@@ -26,14 +25,19 @@ async function command(file, args, options = {}) {
 }
 
 const env = parseEnv(await readFile(join(root, ".env"), "utf8"));
-for (const key of ["DEPLOY_HOST", "DEPLOY_DOMAIN", "MERCHANT_PAY_TO", "FACILITATOR_URL"]) {
+for (const key of ["DEPLOY_HOST", "DEPLOY_DOMAIN"]) {
   if (!env[key]) throw new Error(`Missing ${key} in .env`);
 }
 
 const host = env.DEPLOY_HOST;
+if (!/^[a-z0-9][a-z0-9._@-]*$/i.test(host)) throw new Error("DEPLOY_HOST must be an SSH host or user@host");
 const domain = env.DEPLOY_DOMAIN;
+if (!/^[a-z0-9.-]+$/i.test(domain)) throw new Error("DEPLOY_DOMAIN must be a hostname");
 const port = Number(env.PORT ?? 8790);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("PORT must be a valid user-space port");
+const caddyConfig = await readFile(caddyFile, "utf8");
+if (!caddyConfig.trimStart().startsWith(`${domain} {`)) throw new Error("deploy/caddy/site.caddy must use DEPLOY_DOMAIN as its site address");
+if (!caddyConfig.includes(`reverse_proxy 127.0.0.1:${port}`)) throw new Error("deploy/caddy/site.caddy must proxy to PORT");
 
 async function ssh(script) {
   return command("ssh", [host, script.trim()]);
@@ -41,25 +45,6 @@ async function ssh(script) {
 
 console.log(`Checking and deploying ${service} to ${host}...`);
 await command("npm", ["run", "typecheck"]);
-
-const tempDir = await mkdtemp(join(tmpdir(), "maat-x402-merchant-deploy-"));
-try {
-  const caddyFile = join(tempDir, `${domain}.caddy`);
-  const caddyConfig = (await readFile(caddyTemplate, "utf8"))
-    .replaceAll("__DOMAIN__", domain)
-    .replaceAll("__PORT__", String(port));
-  await writeFile(caddyFile, caddyConfig);
-
-  const productionEnv = [
-    `PORT=${port}`,
-    `VENDOR_BASE_URL=https://${domain}`,
-    `FACILITATOR_URL=${env.FACILITATOR_URL}`,
-    `FACILITATOR_AUTH_TOKEN=${env.FACILITATOR_AUTH_TOKEN ?? ""}`,
-    `MERCHANT_PAY_TO=${env.MERCHANT_PAY_TO}`,
-    "DEMO_ALLOW_UNSIGNED_PAYMENT=false"
-  ].join("\n") + "\n";
-  const envPath = join(tempDir, ".env");
-  await writeFile(envPath, productionEnv, { mode: 0o600 });
 
   await ssh(`
 set -eu
@@ -72,7 +57,7 @@ if [ -f /etc/caddy/sites/${domain}.caddy ]; then cp /etc/caddy/sites/${domain}.c
 
   await command("rsync", ["-az", "--delete", `${join(root, "public")}/`, `${host}:${appDir}/public/`]);
   await command("rsync", ["-az", "server.ts", "package.json", "package-lock.json", "ecosystem.config.cjs", `${host}:${appDir}/`]);
-  await command("rsync", ["-az", envPath, `${host}:${appDir}/.env`]);
+  await command("rsync", ["-az", ".env", `${host}:${appDir}/.env`]);
   await command("rsync", ["-az", caddyFile, `${host}:/etc/caddy/sites/${domain}.caddy`]);
 
   await ssh(`
@@ -82,7 +67,6 @@ chmod 600 .env
 npm ci --omit=dev
 pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
-caddy fmt --overwrite /etc/caddy/sites/${domain}.caddy
 caddy validate --config /etc/caddy/Caddyfile
 systemctl reload caddy
 ready=0
@@ -98,9 +82,5 @@ fi
 pm2 describe ${service} >/dev/null
 echo "remote deployment ready"
 `);
-} finally {
-  await rm(tempDir, { recursive: true, force: true });
-}
-
 console.log(`Published ${domain} through Caddy -> 127.0.0.1:${port}`);
 console.log(`Public check: https://${domain}/health`);

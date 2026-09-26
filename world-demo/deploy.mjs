@@ -3,18 +3,16 @@
  * Reference: docs/Maat project plan.
  */
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const root = dirname(fileURLToPath(import.meta.url));
 const appDir = "/opt/maat-world-demo";
 const service = "maat-world-demo";
-const port = 8791;
-const caddyTemplate = join(root, "deploy/caddy/maat-world-demo.caddy.template");
+const caddyFile = join(root, "deploy/caddy/site.caddy");
 
 function parseEnv(text) {
   return Object.fromEntries(text.split(/\r?\n/).flatMap((line) => {
@@ -36,11 +34,18 @@ async function ssh(script) {
 
 const localEnvPath = join(root, ".env");
 const env = parseEnv(await readFile(localEnvPath, "utf8"));
-for (const key of ["DEPLOY_HOST", "DEPLOY_DOMAIN", "WORLD_ISSUER", "WORLD_CLIENT_ID", "WORLD_CLIENT_SECRET", "WORLD_REDIRECT_URI"]) {
+for (const key of ["DEPLOY_HOST", "DEPLOY_DOMAIN"]) {
   if (!env[key]) throw new Error(`Missing ${key} in .env`);
 }
 const host = env.DEPLOY_HOST;
+if (!/^[a-z0-9][a-z0-9._@-]*$/i.test(host)) throw new Error("DEPLOY_HOST must be an SSH host or user@host");
 const domain = env.DEPLOY_DOMAIN;
+if (!/^[a-z0-9.-]+$/i.test(domain)) throw new Error("DEPLOY_DOMAIN must be a hostname");
+const port = Number(env.PORT ?? 8788);
+if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("PORT must be a valid user-space port");
+const caddyConfig = await readFile(caddyFile, "utf8");
+if (!caddyConfig.trimStart().startsWith(`${domain} {`)) throw new Error("deploy/caddy/site.caddy must use DEPLOY_DOMAIN as its site address");
+if (!caddyConfig.includes(`reverse_proxy 127.0.0.1:${port}`)) throw new Error("deploy/caddy/site.caddy must proxy to PORT");
 const callback = new URL(env.WORLD_REDIRECT_URI);
 if (callback.protocol !== "https:" || callback.hostname !== domain || callback.pathname !== "/auth/world/callback") {
   throw new Error(`WORLD_REDIRECT_URI must be https://${domain}/auth/world/callback`);
@@ -48,21 +53,6 @@ if (callback.protocol !== "https:" || callback.hostname !== domain || callback.p
 
 console.log(`Building ${service} for ${host}...`);
 await command("npm", ["run", "build"]);
-
-const tempDir = await mkdtemp(join(tmpdir(), "maat-world-demo-deploy-"));
-try {
-  const caddyFile = join(tempDir, `${domain}.caddy`);
-  const caddyConfig = (await readFile(caddyTemplate, "utf8")).replaceAll("__DOMAIN__", domain);
-  await writeFile(caddyFile, caddyConfig);
-  const productionEnv = [
-    `WORLD_ISSUER=${env.WORLD_ISSUER}`,
-    `WORLD_CLIENT_ID=${env.WORLD_CLIENT_ID}`,
-    `WORLD_CLIENT_SECRET=${env.WORLD_CLIENT_SECRET}`,
-    `WORLD_REDIRECT_URI=${env.WORLD_REDIRECT_URI}`,
-    `PORT=${port}`,
-  ].join("\n") + "\n";
-  const envPath = join(tempDir, ".env");
-  await writeFile(envPath, productionEnv, { mode: 0o600 });
 
   await ssh(`
 set -eu
@@ -76,7 +66,7 @@ if [ -f /etc/caddy/sites/${domain}.caddy ]; then cp /etc/caddy/sites/${domain}.c
   console.log("Syncing dist/ with rsync...");
   await command("rsync", ["-az", "--delete", `${join(root, "dist")}/`, `${host}:${appDir}/dist/`]);
   await command("rsync", ["-az", "server.ts", "package.json", "package-lock.json", "ecosystem.config.cjs", `${host}:${appDir}/`]);
-  await command("rsync", ["-az", envPath, `${host}:${appDir}/.env`]);
+  await command("rsync", ["-az", ".env", `${host}:${appDir}/.env`]);
   await command("rsync", ["-az", caddyFile, `${host}:/etc/caddy/sites/${domain}.caddy`]);
 
   await ssh(`
@@ -86,7 +76,6 @@ chmod 600 .env
 npm ci --omit=dev
 pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
-caddy fmt --overwrite /etc/caddy/sites/${domain}.caddy
 caddy validate --config /etc/caddy/Caddyfile
 systemctl reload caddy
 ready=0
@@ -102,8 +91,4 @@ fi
 pm2 describe ${service} >/dev/null
 echo "remote deployment ready"
 `);
-} finally {
-  await rm(tempDir, { recursive: true, force: true });
-}
-
 console.log(`Published ${domain} through Caddy -> 127.0.0.1:${port}`);

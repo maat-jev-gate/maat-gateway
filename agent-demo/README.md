@@ -27,4 +27,4 @@ npm run deploy:validate
 npm run deploy
 ```
 
-The deploy script builds the static Vite output, uses `rsync` to upload it to `REMOTE_APP_DIR`, installs the Caddy site for `DEPLOY_DOMAIN`, validates Caddy, reloads it, and checks the public host through the remote machine. The production site is served directly by Caddy; no Node process or PM2 service is needed for this static Agent UI.
+The deploy script builds the static Vite output, syncs it and `deploy/caddy/site.caddy` with `rsync`, validates and reloads Caddy, then checks the site on the remote machine. The production site is served directly by Caddy; no Node process or PM2 service is needed for this static Agent UI.

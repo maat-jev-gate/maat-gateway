@@ -32,3 +32,7 @@ npm run dev
 Open [http://localhost:5174](http://localhost:5174). The browser talks to Vite, which proxies `/api` and `/auth` to Fastify on port `8788`.
 
 The server keeps demo sessions in memory. Restarting the server clears them. Client secrets and ID tokens never go to the React app.
+
+## Publish
+
+Set `DEPLOY_HOST`, `DEPLOY_DOMAIN`, `WORLD_REDIRECT_URI`, and `PORT` to the production values in the local `.env`, then run `npm run deploy`. The script syncs `.env` and `deploy/caddy/site.caddy` directly, reloads PM2 and Caddy, and checks `/api/config` on the remote host.

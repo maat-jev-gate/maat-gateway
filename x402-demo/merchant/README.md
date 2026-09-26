@@ -11,7 +11,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The production merchant console and API are available at `https://merchant.maat-jev-gate.online`. The deployment script reads `DEPLOY_HOST` and `DEPLOY_DOMAIN` from the ignored `.env`, then syncs the service with `rsync` and updates PM2 and Caddy:
+The production merchant console and API are available at `https://merchant.maat-jev-gate.online`. The deployment script reads `DEPLOY_HOST` and `DEPLOY_DOMAIN` from the ignored `.env`, syncs that file and `deploy/caddy/site.caddy` with `rsync`, then updates PM2 and Caddy. Set `VENDOR_BASE_URL=https://merchant.maat-jev-gate.online` in the local `.env` before publishing:
 
 ```bash
 npm run deploy

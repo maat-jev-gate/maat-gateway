@@ -1,4 +1,4 @@
-__DOMAIN__ {
+agent.maat-jev-gate.online {
 	encode zstd gzip
 	root * /opt/maat-agent-demo/dist
 	try_files {path} /index.html
