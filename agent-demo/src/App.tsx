@@ -3,12 +3,23 @@ import { scenarios, type Scenario } from "./scenarios";
 
 type TimelineItem = { kind: "task" | "activity" | "decision" | "result" | "error"; text: string; label?: string; amountUsd?: number; verdict?: string; status?: string; elapsedMs?: number };
 type GatewayDecision = { id?: string; verdict?: string; paymentStatus?: string; error?: string };
+type GatewayInfo = { url: string; endpoints: { pay: string; swap: string } };
 
 export function App() {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo | null>(null);
+  const [gatewayError, setGatewayError] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => { feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" }); }, [timeline]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/demo/gateway", { signal: controller.signal })
+      .then(response => response.ok ? response.json() as Promise<GatewayInfo> : Promise.reject(new Error("Gateway details unavailable.")))
+      .then(setGatewayInfo)
+      .catch(() => { if (!controller.signal.aborted) setGatewayError(true); });
+    return () => controller.abort();
+  }, []);
 
   function append(item: TimelineItem) { setTimeline(current => [...current, item]); }
 
@@ -64,9 +75,10 @@ export function App() {
     <section className="workspace">
       <div className="intro"><p className="eyebrow">AGENT WORKSPACE</p><h1>Agent intents, routed through <em>Ma'at</em>.</h1></div>
       <div className="agent-card"><div className="agent-head"><div className="orb">✦</div><div><b>Atlas Data Buyer</b><span>agentId: maat-demo-agent</span></div><span className="badge">DEMO</span></div>
-        <div className="scenario-list" aria-label="Demo scenarios">{scenarios.map(scenario => <button type="button" className="scenario-button" key={scenario.id} onClick={() => void runScenario(scenario)} disabled={runningId !== null} aria-busy={runningId === scenario.id}><span><b>{scenario.title}</b><small>{scenario.service}</small></span><span className="scenario-action">{runningId === scenario.id ? "Running" : "Run"}</span></button>)}</div>
+        <div className="gateway-connection"><div><span>GATEWAY URL</span><strong>Ma'at Gateway</strong><small>Current integration: HTTP API</small></div><div className="gateway-target">{gatewayInfo ? <><a href={gatewayInfo.url} target="_blank" rel="noopener noreferrer">{gatewayInfo.url}</a><small><code>POST {gatewayInfo.endpoints.pay}</code> · <code>POST {gatewayInfo.endpoints.swap}</code></small></> : <small>{gatewayError ? "Gateway URL unavailable" : "Loading Gateway URL"}</small>}</div></div>
+        <p className="demo-note">This is a scripted demo, not an AI agent. A production agent could use Ma'at through an MCP server or Skill.</p>
         <div className="chat" ref={feedRef} role="log" aria-live="polite">{timeline.length === 0 && <div className="welcome"><span>AGENT</span><p>Select a scenario to send an intent through Ma'at Gateway.</p></div>}{timeline.map((item, index) => item.kind === "decision" ? <article className={`payment ${item.verdict?.toLowerCase() || ""}`} key={index}><div><span>GATEWAY DECISION</span><b>{item.label}</b></div><strong>${item.amountUsd?.toFixed(3)}</strong><small>{item.verdict || "Decision received"}{item.status ? ` · ${item.status}` : ""}{item.elapsedMs !== undefined ? ` · ${item.elapsedMs} ms` : ""}</small><pre>{item.text}</pre></article> : <div className={`bubble ${item.kind}`} key={index}><span>{item.kind === "task" ? "AGENT INTENT" : item.kind === "activity" ? "GATEWAY CALL" : item.kind === "error" ? "ERROR" : "RESULT"}</span><p>{item.text}</p></div>)}</div>
-        <div className="agent-actions"><button type="button" onClick={() => setTimeline([])} disabled={runningId !== null || timeline.length === 0}>Clear activity</button></div>
+        <div className="scenario-section"><div className="scenario-heading"><b>Scenarios</b><button type="button" onClick={() => setTimeline([])} disabled={runningId !== null || timeline.length === 0}>Clear activity</button></div><div className="scenario-list" aria-label="Demo scenarios">{scenarios.map(scenario => <button type="button" className="scenario-button" key={scenario.id} onClick={() => void runScenario(scenario)} disabled={runningId !== null} aria-busy={runningId === scenario.id}><span><b>{scenario.title}</b><small>{scenario.service}</small></span><span className="scenario-action">{runningId === scenario.id ? "Running" : "Run"}</span></button>)}</div></div>
       </div>
     </section>
     <footer><span>MA'AT GATEWAY / AGENT DEMO</span><span>Gateway authentication stays on the server</span></footer>

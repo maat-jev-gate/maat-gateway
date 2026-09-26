@@ -18,6 +18,7 @@ const gatewayUser = required("GATEWAY_BASIC_USER");
 const gatewayPassword = required("GATEWAY_BASIC_PASSWORD");
 const gatewayUrl = new URL(required("GATEWAY_URL"));
 if ((gatewayUrl.protocol !== "https:" && !(gatewayUrl.protocol === "http:" && ["127.0.0.1", "localhost"].includes(gatewayUrl.hostname))) || gatewayUrl.pathname !== "/api/maat/pay") throw new Error("GATEWAY_URL must be an HTTPS Gateway pay endpoint or a local HTTP endpoint.");
+const gatewayPaths = { pay: "/api/maat/pay", swap: "/api/maat/swap" } as const;
 const merchantUrl = new URL(required("MERCHANT_BASE_URL"));
 if (merchantUrl.protocol !== "https:") throw new Error("MERCHANT_BASE_URL must be an HTTPS origin.");
 const gatewayAuth = `Basic ${Buffer.from(`${gatewayUser}:${gatewayPassword}`).toString("base64")}`;
@@ -41,6 +42,7 @@ async function forward(response: Response, reply: FastifyReply) {
 }
 
 app.get("/health", async () => ({ ok: true, service: "maat-agent-demo" }));
+app.get("/api/demo/gateway", async () => ({ url: gatewayUrl.origin, endpoints: gatewayPaths }));
 app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay/:index", async (request, reply) => {
   const scenario = scenarios.find((item) => item.id === request.params.id);
   const index = Number(request.params.index);
@@ -48,7 +50,7 @@ app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay
     return reply.code(400).send({ error: "Invalid payment scenario or call." });
   }
   const call = scenario.calls[index];
-  const response = await gatewayRequest("/api/maat/pay", {
+  const response = await gatewayRequest(gatewayPaths.pay, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ agentId: "maat-demo-agent", url: new URL(call.path, merchantUrl).toString(), method: call.method, authorization: scenario.id === "payment-allow" ? `${scenario.task} This specific payment is for ${call.label} at ${call.amountUsd} USDC.` : scenario.task, purpose: call.purpose, taskId: `demo-${scenario.id}` }),
@@ -58,7 +60,7 @@ app.post<{ Params: { id: string; index: string } }>("/api/demo/scenarios/:id/pay
 app.post<{ Params: { id: string } }>("/api/demo/scenarios/:id/swap", async (request, reply) => {
   const scenario = scenarios.find((item) => item.id === request.params.id);
   if (!scenario || !("swap" in scenario)) return reply.code(400).send({ error: "Invalid swap scenario." });
-  const response = await gatewayRequest("/api/maat/swap", {
+  const response = await gatewayRequest(gatewayPaths.swap, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ agentId: "maat-demo-agent", taskId: `demo-${scenario.id}`, purpose: scenario.task, ...scenario.swap }),
