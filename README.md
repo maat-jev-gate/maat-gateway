@@ -37,6 +37,7 @@ DNS should point these four hostnames to the deployment server. Caddy terminates
 maat-gateway/
 ├── agent-demo/   Browser demo that sends authenticated payment intents to the Gateway
 ├── gateway/      Maat Gateway API, JEV backend integration, World approval state machine, and polling observer UI
+├── swap-guard/   Standalone Next.js swap guard on Ethereum mainnet: Uniswap quote, Intercepta, deployer forensics, JEV (analysis only)
 ├── x402-demo/
 │   ├── merchant/ x402 Merchant that returns HTTP 402 requirements and settles a supplied payment
 │   └── client/   Direct MetaMask-to-Merchant learning demo; not the final Agent path
