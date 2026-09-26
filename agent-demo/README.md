@@ -7,7 +7,7 @@ The Agent interface presents six independent scenes from the demo script:
 | Accept dataset purchase | `POST /api/maat/pay` | Buys one $0.001 dataset and displays the returned rows. |
 | Block verification fee | `POST /api/maat/pay` | Sends the Merchant's $80 verification request for a Gateway decision. |
 | Block risky recipient | `POST /api/maat/pay` | Requests a $0.001 x402 resource whose Merchant quote uses the configured risk recipient. Intercepta decides whether it is blocked. |
-| Approve dataset purchase | `POST /api/maat/pay` | Requests a labeled demo escalation for one $0.001 dataset; payment follows World ID approval. |
+| Approve dataset purchase | `POST /api/maat/pay` | Requests a $0.001 dataset with uncertain coverage. JEV evaluates the live quote; owner approval is required before payment. |
 | Review ETH-to-USDC swap | `POST /api/maat/swap` | Requests a $30 mainnet analysis and displays the Guard's live verdict. `ESCALATE` creates a World ID approval; no trade runs. |
 | Screen a social token | `POST /api/maat/swap` | Requests a live ETH-to-PEPE analysis and displays the Guard's verdict and quote. No trade runs. |
 
@@ -15,7 +15,7 @@ The browser calls only the Agent service's same-origin `/api/demo/scenarios/*` r
 
 The Merchant's 402 quote supplies the payment recipient. The Gateway screens that address with Intercepta before signing the Base Sepolia payment. For the risk scene, set `MERCHANT_RISK_PAY_TO` in the Merchant's ignored `.env` to a known-risk mainnet address from Intercepta's pinned ETHGlobal Discord message.
 
-The approval scene sends `demoEscalate: true` for its fixed Agent and task ID. The Gateway still checks the Merchant quote and Intercepta before returning an `ESCALATE` decision labeled `demo`; JEV is skipped for this scene. The Gateway console can confirm with World ID or cancel without payment. After approval, the Agent polls the original decision and shows the purchased data only after the Merchant payment completes. World ID must be configured on the Gateway for confirmation to proceed.
+The approval scene sends `demoEscalate: true` for its fixed Agent and task ID. The Gateway checks the Merchant quote and Intercepta, then calls JEV. A JEV probability between 0.30 and 0.80 escalates on its own; otherwise the scene uses a labeled demo override to require owner review. The Gateway console can confirm with World ID or cancel without payment. After approval, the Agent polls the original decision and shows the purchased data only after the Merchant payment completes. World ID must be configured on the Gateway for confirmation to proceed.
 
 The current Agent adapter makes direct HTTP tool calls. An MCP server could expose the same `maat_pay` and `maat_swap` operations to general-purpose agents; this demo does not claim to use MCP today.
 

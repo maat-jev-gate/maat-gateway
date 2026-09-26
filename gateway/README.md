@@ -85,7 +85,7 @@ For a blocked demo, use a mainnet address from the pinned Intercepta channel in 
 
 An `ESCALATE` response has HTTP `202`, an `approvalId`, and an `intentHash`. The original intent is stored server-side. The browser polls `GET /api/maat/approvals/:id`; it never decides whether a request is approved.
 
-The fixed Agent approval scene sends `demoEscalate: true`, scoped to `maat-demo-agent` and task `demo-payment-escalate`. After the live Merchant and Intercepta checks, the Gateway returns a decision labeled `demo` without calling JEV. The pending card offers World ID confirmation and `POST /api/maat/approvals/:id/cancel`; cancellation records `cancelled` and prevents a later World callback from releasing the payment.
+The fixed Agent approval scene sends `demoEscalate: true`, scoped to `maat-demo-agent` and task `demo-payment-escalate`. After the live Merchant and Intercepta checks, the Gateway calls JEV. Its result is used when it escalates; otherwise a labeled demo override requires owner review. The JEV row shows its returned probability and confidence separately, with `N/A` when confidence is absent. The pending card offers World ID confirmation and `POST /api/maat/approvals/:id/cancel`; cancellation records `cancelled` and prevents a later World callback from releasing the payment.
 
 Gateway decisions and approvals are saved to the local, Git-ignored `data/history.json` file in development and production. The console's **Clear History** action asks for confirmation and then calls `DELETE /api/maat/history`. It removes saved decisions and approvals without changing Gateway settings or Merchant records.
 
@@ -129,12 +129,13 @@ The observer UI runs at `http://localhost:5176`. The API runs at `http://localho
 | `GATEWAY_BASIC_USER` / `GATEWAY_BASIC_PASSWORD` | Server-side credentials required by Agent payment and swap requests |
 | `MAAT_TREASURY_PRIVATE_KEY` | Server-only 32-byte hex private key used to sign x402 payments |
 | `INTERCEPTA_API_KEY` | Server-only Intercepta key; required for real x402 payments |
-| `INTERCEPTA_API_URL` / `INTERCEPTA_CACHE` | Optional API base URL and ten-minute response cache control |
+| `INTERCEPTA_API_URL` / `INTERCEPTA_CACHE` / `INTERCEPTA_TIMEOUT_MS` | Optional API base URL, ten-minute response cache, and per-call timeout (15 seconds by default) |
 | `JEV_API_URL` / `JEV_API_KEY` / `JEV_MODEL` | Direct TypeSafe JEV connection used by the Gateway |
 | `WORLD_ISSUER` | World Sandbox issuer, normally `https://sandbox.auth.world.org` |
 | `WORLD_CLIENT_ID` / `WORLD_CLIENT_SECRET` | Confidential World OIDC client credentials |
 | `WORLD_REDIRECT_URI` | Registered callback URL for this Gateway |
 | `MERCHANT_TIMEOUT_MS` | Timeout for each Merchant request |
+| `PAYMENT_FLOW_TIMEOUT_MS` | Total budget for payment decisions and settlement (60 seconds by default) |
 | `MERCHANT_URL` | Merchant resource URL used by the Gateway console defaults and demo requests |
 | `SWAP_GUARD_URL` | HTTPS origin of the standalone Swap Guard analysis API |
 

@@ -30,6 +30,7 @@ export const config = {
   interceptaKey: () => env("INTERCEPTA_API_KEY"),
   interceptaUrl: () => env("INTERCEPTA_API_URL", "https://api.web3antivirus.io").replace(/\/+$/, ""),
   interceptaCache: () => env("INTERCEPTA_CACHE", "on").toLowerCase() !== "off",
+  interceptaTimeoutMs: () => Number(env("INTERCEPTA_TIMEOUT_MS", "15000")) || 15000,
   uniswapKey: () => env("UNISWAP_API_KEY"),
   uniswapUrl: () => env("UNISWAP_API_URL", "https://trade-api.gateway.uniswap.org/v1").replace(/\/+$/, ""),
   uniswapSwapper: () => env("UNISWAP_SWAPPER"),

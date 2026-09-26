@@ -37,7 +37,7 @@ async function get<T>(path: string): Promise<{ body: T; cached: boolean }> {
   if (useCache && hit && Date.now() - hit.at < CACHE_MS) return { body: hit.value as T, cached: true };
   const body = await fetchJson<T>(`${config.interceptaUrl()}${path}`, {
     headers: { "X-API-KEY": config.interceptaKey(), Accept: "application/json" },
-    timeoutMs: 8_000,
+    timeoutMs: config.interceptaTimeoutMs(),
   });
   if (useCache) cache.set(path, { at: Date.now(), value: body });
   return { body, cached: false };

@@ -40,6 +40,7 @@ type PayDecision = {
   decidedBy: "jev" | "gateway" | "fallback" | "error" | "intercepta" | "demo";
   confidence?: number;
   probability?: number;
+  jevVerdict?: "ALLOW" | "BLOCK" | "ESCALATE";
   jevOverride?: "ALLOW" | "BLOCK" | "ESCALATE";
   reasons: string[];
   intent: PayRequest;
@@ -91,6 +92,8 @@ type MerchantResult = { status: number; requirements: unknown; response: unknown
 type PaymentRequirements = { scheme: "exact"; network: string; asset: string; amount: string; payTo: string; maxTimeoutSeconds: number; extra: { name: string; version: string } };
 
 const port = Number(process.env.PORT ?? 8787);
+const merchantTimeoutMs = Number(process.env.MERCHANT_TIMEOUT_MS ?? 15_000);
+const paymentFlowTimeoutMs = Number(process.env.PAYMENT_FLOW_TIMEOUT_MS ?? 60_000);
 const staticRoot = fileURLToPath(new URL("../dist", import.meta.url));
 const dataDir = fileURLToPath(new URL("../data/", import.meta.url));
 const historyFile = join(dataDir, "history.json");
@@ -158,7 +161,7 @@ function addDecision(decision: Decision) {
 
 async function settleDecisionPayment(decision: PayDecision, input: PayRequest, quote: MerchantResult, startedAt: number) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.MERCHANT_TIMEOUT_MS ?? 15000));
+  const timeout = setTimeout(() => controller.abort(), paymentFlowTimeoutMs);
   try {
     if (gatewaySettings.bypassRealPayment) {
       decision.paymentStatus = "completed";
@@ -258,7 +261,7 @@ async function verifyWorldToken(idToken: string, nonce: string): Promise<JWTPayl
 async function merchantRequest(input: PayRequest, signal: AbortSignal): Promise<MerchantResult> {
   let response: Response;
   try {
-    response = await fetch(input.url, { method: input.method, signal, redirect: "manual" });
+    response = await fetch(input.url, { method: input.method, signal: AbortSignal.any([signal, AbortSignal.timeout(merchantTimeoutMs)]), redirect: "manual" });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown network error";
     throw new Error(`Merchant request failed (${input.method} ${input.url}): ${reason}`);
@@ -313,7 +316,7 @@ async function createPaymentSignature(requirements: PaymentRequirements) {
 async function settleMerchantRequest(input: PayRequest, quote: MerchantResult, signal: AbortSignal): Promise<MerchantResult & { payer: string }> {
   const requirements = paymentRequirements(quote);
   const payment = await createPaymentSignature(requirements);
-  const response = await fetch(input.url, { method: input.method, headers: { "PAYMENT-SIGNATURE": payment.header }, signal, redirect: "manual" });
+  const response = await fetch(input.url, { method: input.method, headers: { "PAYMENT-SIGNATURE": payment.header }, signal: AbortSignal.any([signal, AbortSignal.timeout(merchantTimeoutMs)]), redirect: "manual" });
   const text = await response.text();
   let body: unknown = text;
   try { body = text ? JSON.parse(text) : undefined; } catch { /* Preserve non-JSON merchant responses. */ }
@@ -357,7 +360,7 @@ async function evaluateWithJev(input: PayRequest, merchant: Partial<MerchantResu
   if (typeof probability !== "number" || !Number.isFinite(probability) || probability < 0 || probability > 1) {
     throw new Error("JEV returned an invalid intent-match probability.");
   }
-  return { probability, confidence: typeof answer?.confidence === "number" ? answer.confidence : probability, latencyMs: Math.round(performance.now() - startedAt) };
+  return { probability, confidence: typeof answer?.confidence === "number" && Number.isFinite(answer.confidence) ? answer.confidence : undefined, latencyMs: Math.round(performance.now() - startedAt) };
 }
 
 app.get("/health", async () => ({ ok: true, service: "maat-gateway", decisions: decisions.length }));
@@ -384,7 +387,7 @@ app.post<{ Body: { scenario?: DemoScenario; purpose?: string } }>("/api/maat/dem
   const input: PayRequest = { agentId: "maat-demo-agent", url: gatewaySettings.merchantUrl, method: "GET", purpose: request.body?.purpose?.trim() || "Purchase one Atlas dataset", taskId: `gateway-ui-${scenario}` };
   const startedAt = performance.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.MERCHANT_TIMEOUT_MS ?? 15000));
+  const timeout = setTimeout(() => controller.abort(), paymentFlowTimeoutMs);
   let merchant: { status?: number; requirements?: unknown; response?: unknown; payer?: string } = {};
   try {
     const merchantStartedAt = performance.now();
@@ -566,7 +569,7 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
   }
   const totalStartedAt = performance.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.MERCHANT_TIMEOUT_MS ?? 15000));
+  const timeout = setTimeout(() => controller.abort(), paymentFlowTimeoutMs);
   let merchant: { status?: number; requirements?: unknown; response?: unknown; payer?: string } = {};
   try {
     const merchantStartedAt = performance.now();
@@ -594,10 +597,6 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
     } else if (risk && risk.status !== "clear") {
       verdict = "BLOCK";
       decidedBy = "intercepta";
-    } else if (input.demoEscalate) {
-      verdict = "ESCALATE";
-      decidedBy = "demo";
-      reasons.push("The Agent requested the approval demo; JEV was skipped for this decision.");
     } else if (bypassJev) {
       verdict = gatewaySettings.jevBypassVerdict;
       decidedBy = "fallback";
@@ -619,9 +618,15 @@ app.post<{ Body: PayRequest }>("/api/maat/pay", async (request, reply) => {
         reasons.push(`Using the configured ${verdict} result.`);
       }
     }
+    const jevVerdict = decidedBy === "jev" ? verdict : undefined;
+    if (input.demoEscalate && verdict !== "ESCALATE" && decidedBy !== "gateway" && decidedBy !== "intercepta") {
+      verdict = "ESCALATE";
+      decidedBy = "demo";
+      reasons.push("The approval demo requires owner review when JEV does not escalate the payment.");
+    }
     const paymentExecuted = false;
     const decisionId = crypto.randomUUID();
-    const decision: PayDecision = { id: decisionId, createdAt: new Date().toISOString(), ...input, kind: "pay", verdict, decidedBy, confidence, probability, jevApi, jevOverride: decidedBy === "fallback" && bypassJev ? gatewaySettings.jevBypassVerdict : undefined, reasons, intent: input, merchant, payer: merchant.payer, intercepta: risk, interceptaOverride: risk && gatewaySettings.bypassIntercepta ? gatewaySettings.interceptaBypassVerdict : undefined, paymentExecuted, paymentStatus: verdict === "BLOCK" ? "completed" : "pending", timings: { totalMs: Math.round(performance.now() - totalStartedAt), merchantMs, jevMs, interceptaMs: risk?.ms } };
+    const decision: PayDecision = { id: decisionId, createdAt: new Date().toISOString(), ...input, kind: "pay", verdict, decidedBy, confidence, probability, jevVerdict, jevApi, jevOverride: decidedBy === "fallback" && bypassJev ? gatewaySettings.jevBypassVerdict : undefined, reasons, intent: input, merchant, payer: merchant.payer, intercepta: risk, interceptaOverride: risk && gatewaySettings.bypassIntercepta ? gatewaySettings.interceptaBypassVerdict : undefined, paymentExecuted, paymentStatus: verdict === "BLOCK" ? "completed" : "pending", timings: { totalMs: Math.round(performance.now() - totalStartedAt), merchantMs, jevMs, interceptaMs: risk?.ms } };
     if (verdict === "ESCALATE") {
       const approvalId = crypto.randomUUID();
       const hash = intentHash(input);

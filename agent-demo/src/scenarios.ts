@@ -26,8 +26,8 @@ export const scenarios = [
     id: "payment-escalate",
     title: "Approve dataset purchase",
     service: "x402 pay + World ID",
-    task: "Purchase one Atlas dataset for $0.001 with human approval before payment.",
-    calls: [{ label: "Atlas dataset", path: "/merchant/dataset/beta", method: "GET", purpose: "Purchase one Atlas dataset for 0.001 USDC", amountUsd: 0.001 }],
+    task: "Buy one Atlas dataset for 0.001 USDC if it includes the 2026 Tokyo records; ask me before paying if the coverage is unclear.",
+    calls: [{ label: "Atlas beta dataset", path: "/merchant/dataset/beta", method: "GET", purpose: "Purchase the Atlas beta dataset for 0.001 USDC. The payment quote does not describe its coverage.", amountUsd: 0.001 }],
   },
   {
     id: "swap-approval",

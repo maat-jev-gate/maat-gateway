@@ -57,7 +57,7 @@ async function get(path: string, signal?: AbortSignal): Promise<{ response: unkn
   if (cached && cached.expiresAt > Date.now()) return { response: cached.response, cached: true };
   const response = await fetch(`${(process.env.INTERCEPTA_API_URL?.trim() || API_URL).replace(/\/+$/, "")}${path}`, {
     headers: { "X-API-KEY": key, Accept: "application/json" },
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8_000)]) : AbortSignal.timeout(8_000),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(Number(process.env.INTERCEPTA_TIMEOUT_MS ?? 15_000))]) : AbortSignal.timeout(Number(process.env.INTERCEPTA_TIMEOUT_MS ?? 15_000)),
   });
   if (!response.ok) throw new Error(`Intercepta request failed (HTTP ${response.status}).`);
   const body: unknown = await response.json();

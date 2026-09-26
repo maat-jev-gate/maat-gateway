@@ -41,6 +41,7 @@ Set `MAAT_DEBUG=1` to log every explorer call with its duration.
 | `BLOCKSCOUT_URL`, `BLOCKSCOUT_API_KEY` | no | Address labels and scam flags (Blockscout v2 API) |
 | `INTERCEPTA_API_KEY` | for Intercepta | Token scan + address quick scans |
 | `INTERCEPTA_CACHE` | no | `on` caches responses per address for 10 min; set `off` when recording |
+| `INTERCEPTA_TIMEOUT_MS` | no | Per-call timeout, 15 seconds by default |
 | `UNISWAP_API_KEY` | for Trading API | Without it, quotes come from the Uniswap v2 Router and v3 QuoterV2 contracts via `eth_call` |
 | `UNISWAP_SWAPPER` | no | `swapper` field for Trading API quotes |
 | `JEV_API_URL`, `JEV_API_KEY`, `JEV_MODEL` | for JEV | TypeSafe `…/v1/systemone` (`jev-latest`) or the Vercel AI Gateway base `https://ai-gateway.vercel.sh/v1` (`typesafe-ai/jev`) |
