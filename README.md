@@ -12,7 +12,7 @@ The Agent never receives the treasury private key. The Gateway owns the decision
 
 ## Public subdomains
 
-The four public projects use the following subdomains under `maat-jev-gate.online`:
+The public projects use the following subdomains under `maat-jev-gate.online`:
 
 | Project | Public URL | Purpose |
 | --- | --- | --- |
@@ -20,6 +20,7 @@ The four public projects use the following subdomains under `maat-jev-gate.onlin
 | `gateway/` | `https://gateway.maat-jev-gate.online` | Maat Gateway API and observer UI |
 | `agent-demo/` | `https://agent.maat-jev-gate.online` | Agent payment demonstration UI |
 | `world-demo/` | `https://world-demo.maat-jev-gate.online` | World ID verification demonstration and callback endpoint |
+| `swap-guard/` | `https://swap.maat-jev-gate.online` | Ethereum mainnet Swap analysis dashboard and HTTP API; no trading execution |
 
 `x402-demo/client/` is a local MetaMask learning client and does not receive a public subdomain or a remote deployment.
 
@@ -29,7 +30,7 @@ The World callback must remain:
 https://world-demo.maat-jev-gate.online/auth/world/callback
 ```
 
-DNS should point these four hostnames to the deployment server. Caddy terminates HTTPS and routes the two server applications (`gateway` and `merchant`) to their local Node ports; `agent-demo` is static output, and `world-demo` uses its existing PM2 and Caddy deployment setup.
+DNS should point these hostnames to the deployment server. Caddy terminates HTTPS and routes each server application to its local Node port.
 
 ## Subprojects
 

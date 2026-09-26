@@ -2,6 +2,8 @@
 
 A standalone single-page Next.js app for the swap half of Maat: an AI agent asks to buy a token with ETH, and the gate collects live evidence, applies the hard rules, asks JEV about whatever is left, and returns `ALLOW`, `BLOCK`, or `ESCALATE`.
 
+Live demo: https://swap.maat-jev-gate.online
+
 It covers the swap modules from the project plan:
 
 | Module | What this app does |
@@ -25,6 +27,8 @@ npm run dev            # http://localhost:3000
 ```
 
 Production: `npm run build && npm start`. The decision log and the daily total are kept in server memory (see [Limits](#limits)), so run it as one long-lived Node process (`next start`, PM2) rather than serverless.
+
+To publish the standalone demo, set `PORT`, `DEPLOY_HOST`, and `DEPLOY_DOMAIN` in the ignored `.env`, then run `npm run deploy`. The script builds locally, syncs the production build and `.env`, starts a single PM2 process, configures Caddy, and checks the API on the host. The HTTP API is currently public and intended for the analysis-only demo; add service authentication and request limits before using it as a Gateway dependency.
 
 Set `MAAT_DEBUG=1` to log every explorer call with its duration.
 
@@ -53,6 +57,14 @@ Set `MAAT_DEBUG=1` to log every explorer call with its duration.
 ```
 
 `amountIn` (ETH) can be sent instead of `amountUsd`. With `Accept: application/x-ndjson` the response streams one stage event per line as each lookup starts and ends, and the Decision comes last. The page uses this to draw the waterfall live.
+
+For a JSON response:
+
+```bash
+curl -X POST https://swap.maat-jev-gate.online/api/maat/swap \
+  -H 'Content-Type: application/json' \
+  -d '{"agentId":"demo-agent","chainId":1,"tokenIn":"ETH","tokenOut":"0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984","amountUsd":8,"source":"owner","instruction":"Assess this UNI purchase"}'
+```
 
 Other routes:
 
