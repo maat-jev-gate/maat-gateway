@@ -10,14 +10,14 @@ The Agent has no treasury key. The Gateway signs approved x402 payments; swap re
 
 ## Projects
 
-| Project | Subproject | URL | Purpose | Integrations |
+| Project | Subfolder | URL | Purpose | Integrations |
 | --- | --- | --- | --- | --- |
-| Maat Gateway | [`gateway/`](gateway/) | [https://gateway.maat-jev-gate.online](https://gateway.maat-jev-gate.online) | Payment decisions, approval, and observer UI | World ID for Agents, Intercepta, JEV |
-| Maat Agent | [`agent-demo/`](agent-demo/) | [https://agent.maat-jev-gate.online](https://agent.maat-jev-gate.online) | Agent payment and swap demonstration | Gateway API |
-| Maat Merchant | [`x402-demo/merchant/`](x402-demo/merchant/) | [https://merchant.maat-jev-gate.online](https://merchant.maat-jev-gate.online) | x402 resource quotes and payment settlement | x402 |
-| Maat Swap Guard | [`swap-guard/`](swap-guard/) | [https://swap.maat-jev-gate.online](https://swap.maat-jev-gate.online) | Ethereum mainnet swap analysis; no trading execution | Uniswap, Intercepta, JEV |
+| Gateway | [`gateway/`](gateway/) | [https://gateway.maat-jev-gate.online](https://gateway.maat-jev-gate.online) | Payment decisions, approval, and observer UI | World ID for Agents, Intercepta, JEV |
+| Agent | [`agent-demo/`](agent-demo/) | [https://agent.maat-jev-gate.online](https://agent.maat-jev-gate.online) | Agent payment and swap demonstration | Gateway API |
+| Merchant | [`x402-demo/merchant/`](x402-demo/merchant/) | [https://merchant.maat-jev-gate.online](https://merchant.maat-jev-gate.online) | x402 resource quotes and payment settlement | x402 |
+| Swap Guard | [`swap-guard/`](swap-guard/) | [https://swap.maat-jev-gate.online](https://swap.maat-jev-gate.online) | Ethereum mainnet swap analysis; no trading execution | Uniswap, Intercepta, JEV |
 | x402 Client | [`x402-demo/client/`](x402-demo/client/) | — | Local MetaMask payment demo | MetaMask, Merchant API |
-| Maat Demo | [`maat-demo/`](maat-demo/) | [https://demo.maat-jev-gate.online](https://demo.maat-jev-gate.online) | Auxiliary three-column observer for the Agent, Gateway, and Merchant; columns can also load Swap Guard | Agent, Gateway, Merchant, Swap Guard pages |
+| Demo | [`maat-demo/`](maat-demo/) | [https://demo.maat-jev-gate.online](https://demo.maat-jev-gate.online) | Auxiliary three-column observer for the Agent, Gateway, and Merchant; columns can also load Swap Guard | Agent, Gateway, Merchant, Swap Guard pages |
 
 DNS should point these hostnames to the deployment server. Caddy terminates HTTPS and routes each server application to its local Node port.
 
