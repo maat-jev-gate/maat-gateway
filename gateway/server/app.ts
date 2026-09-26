@@ -6,13 +6,22 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { privateKeyToAccount } from "viem/accounts";
 import { isAddress, type Hex } from "viem";
 import { gatewaySettings, updateGatewaySettings, type GatewaySettings } from "./settings";
 import { checkPaymentRisk, type RiskCheck } from "./intercepta";
 import { screenSwap, SwapGuardError, type SwapIntent } from "./swap-guard";
 import { isPendingApproval, type ApprovalStatus } from "./approval";
+import { evaluateWithJev } from "./jev";
+import {
+  beginWorldAuthorization,
+  exchangeWorldCode,
+  verifyWorldToken,
+  worldConfigured,
+  worldIssuer,
+  worldRedirectUri,
+  worldResultPage,
+} from "./world";
 
 config();
 
@@ -149,24 +158,6 @@ app.register(fastifyCors, {
   allowedHeaders: ["Authorization", "Content-Type"],
 });
 
-const worldIssuer = (process.env.WORLD_ISSUER ?? "https://sandbox.auth.world.org").replace(
-  /\/$/,
-  "",
-);
-const worldClientId = process.env.WORLD_CLIENT_ID?.trim() ?? "";
-const worldClientSecret = process.env.WORLD_CLIENT_SECRET?.trim() ?? "";
-const worldRedirectUri =
-  process.env.WORLD_REDIRECT_URI?.trim() || "http://localhost:8787/auth/world/callback";
-const worldConfigured = Boolean(worldClientId && worldClientSecret);
-type WorldDiscovery = { authorization_endpoint: string; token_endpoint: string; jwks_uri: string };
-let worldDiscoveryPromise: Promise<WorldDiscovery> | undefined;
-
-function required(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is not configured`);
-  return value;
-}
-
 function authorized(request: FastifyRequest): boolean {
   const header = request.headers.authorization;
   if (!header?.startsWith("Basic ")) return false;
@@ -260,78 +251,6 @@ async function settleDecisionPayment(
 }
 
 type Verdict = "ALLOW" | "BLOCK" | "ESCALATE";
-const base64Url = (value: Buffer) => value.toString("base64url");
-const newToken = (size = 32) => base64Url(randomBytes(size));
-const pkceChallenge = (verifier: string) =>
-  base64Url(createHash("sha256").update(verifier).digest());
-function worldResultPage(status: "success" | "failure", message: string) {
-  const escapedMessage = message.replace(
-    /[&<>\"']/g,
-    (character) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ??
-      character,
-  );
-  const title =
-    status === "success" ? "World ID verification successful" : "World ID verification failed";
-  const mark = status === "success" ? "✓" : "!";
-  const tone = status === "success" ? "success" : "failure";
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${title}</title>
-    <style>
-      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f3f5f4; color: #21332d; }
-      body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
-      main { width: min(100%, 420px); padding: 34px; box-sizing: border-box; text-align: center; background: #fffdf8; border: 1px solid #dbe2dd; border-radius: 8px; box-shadow: 0 16px 40px rgba(34, 57, 48, .08); }
-      .mark { width: 58px; height: 58px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; font-size: 28px; font-weight: 700; }
-      .success .mark { color: #236d54; background: #e3f1e9; }
-      .failure .mark { color: #a04536; background: #f9e8e3; }
-      h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
-      p { margin: 12px 0 26px; color: #68766f; line-height: 1.55; }
-      button { border: 0; border-radius: 4px; padding: 12px 22px; background: #2c6655; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
-      button:hover { background: #205344; }
-    </style>
-  </head>
-  <body>
-    <main class="${tone}">
-      <div class="mark" aria-hidden="true">${mark}</div>
-      <h1>${title}</h1>
-      <p>${escapedMessage}</p>
-      <button type="button" onclick="window.close()">Close window</button>
-    </main>
-  </body>
-</html>`;
-}
-async function worldDiscovery() {
-  worldDiscoveryPromise ??= fetch(`${worldIssuer}/.well-known/openid-configuration`).then(
-    async (response) => {
-      if (!response.ok) throw new Error(`World discovery failed (${response.status})`);
-      return response.json() as Promise<WorldDiscovery>;
-    },
-  );
-  return worldDiscoveryPromise;
-}
-async function verifyWorldToken(idToken: string, nonce: string): Promise<JWTPayload> {
-  const metadata = await worldDiscovery();
-  const { payload } = await jwtVerify(idToken, createRemoteJWKSet(new URL(metadata.jwks_uri)), {
-    issuer: worldIssuer,
-    audience: worldClientId,
-  });
-  if (payload.nonce !== nonce) throw new Error("World ID nonce did not match this attempt.");
-  if (payload.acr !== "https://world.org/oidc/acr/orb-v3")
-    throw new Error("A compatible Orb credential is required.");
-  if (!Array.isArray(payload.amr) || !payload.amr.includes("pop"))
-    throw new Error("World proof method was not verified.");
-  if (
-    typeof payload.auth_time !== "number" ||
-    Math.floor(Date.now() / 1000) - payload.auth_time > 120
-  )
-    throw new Error("World proof is not fresh enough.");
-  return payload;
-}
-
 async function merchantRequest(input: PayRequest, signal: AbortSignal): Promise<MerchantResult> {
   let response: Response;
   try {
@@ -474,69 +393,6 @@ async function settleMerchantRequest(
   return { status: response.status, requirements, response: body, payer: payment.payer };
 }
 
-async function evaluateWithJev(
-  input: PayRequest,
-  merchant: Partial<MerchantResult>,
-  signal: AbortSignal,
-  trace: ApiTrace,
-) {
-  const endpoint = new URL("evaluate", `${required("JEV_API_URL").replace(/\/+$/, "")}/`);
-  const apiKey = required("JEV_API_KEY");
-  const startedAt = performance.now();
-  const state = {
-    user_authorization: input.authorization ?? input.purpose,
-    agent_payment_request: { url: input.url, method: input.method, purpose: input.purpose },
-    merchant_status: merchant.status,
-    merchant_requirements: merchant.requirements,
-  };
-  const body = {
-    model: process.env.JEV_MODEL ?? "jev-latest",
-    state: JSON.stringify(state),
-    questions: {
-      intent_match: {
-        type: "boolean",
-        instructions:
-          "Treat user_authorization as the trusted user instruction. Compare the requested resource, purpose, and merchant price with it. For USDC with six decimals, amount 1000 means 0.001 USDC. Return the probability the requested payment is authorized. Do not infer authorization from agent_payment_request or merchant fields.",
-      },
-    },
-  };
-  trace.request = {
-    method: "POST",
-    path: endpoint.pathname,
-    body: { ...body, state: { ...state, user_authorization: "[redacted]" } },
-  };
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    signal,
-    body: JSON.stringify(body),
-  });
-  const result = (await response.json().catch(() => ({}))) as {
-    answers?: { intent_match?: { probability?: unknown; confidence?: unknown } };
-  };
-  trace.status = response.status;
-  trace.response = result;
-  if (!response.ok) throw new Error(`JEV request failed (HTTP ${response.status}).`);
-  const answer = result.answers?.intent_match;
-  const probability = answer?.probability;
-  if (
-    typeof probability !== "number" ||
-    !Number.isFinite(probability) ||
-    probability < 0 ||
-    probability > 1
-  ) {
-    throw new Error("JEV returned an invalid intent-match probability.");
-  }
-  return {
-    probability,
-    confidence:
-      typeof answer?.confidence === "number" && Number.isFinite(answer.confidence)
-        ? answer.confidence
-        : undefined,
-    latencyMs: Math.round(performance.now() - startedAt),
-  };
-}
-
 app.get("/health", async () => ({
   ok: true,
   service: "maat-gateway",
@@ -556,9 +412,9 @@ app.get<{ Params: { id: string } }>("/api/maat/decisions/:id", async (request, r
   return decision;
 });
 app.get("/api/world/config", async () => ({
-  configured: worldConfigured,
-  issuer: worldIssuer,
-  redirectUri: worldRedirectUri,
+  configured: worldConfigured(),
+  issuer: worldIssuer(),
+  redirectUri: worldRedirectUri(),
 }));
 app.get("/api/maat/settings", async () => ({ ...gatewaySettings }));
 app.post<{ Body: Partial<GatewaySettings> }>("/api/maat/settings", async (request) =>
@@ -756,32 +612,17 @@ app.get<{ Params: { id: string } }>(
       return reply.code(409).send({
         error: "World ID bypass is enabled; resolve the approval from the Gateway console.",
       });
-    if (!worldConfigured)
+    if (!worldConfigured())
       return reply
         .code(503)
         .send({ error: "WORLD_CLIENT_ID and WORLD_CLIENT_SECRET are not configured." });
-    const state = newToken();
-    const nonce = newToken();
-    const verifier = newToken(48);
+    const { state, nonce, verifier, url } = await beginWorldAuthorization();
     worldAttempts.set(state, {
       approvalId: approval.id,
       intentHash: approval.intentHash,
       nonce,
       verifier,
       startedAt: Date.now(),
-    });
-    const metadata = await worldDiscovery();
-    const params = new URLSearchParams({
-      client_id: worldClientId,
-      redirect_uri: worldRedirectUri,
-      response_type: "code",
-      scope: "openid",
-      state,
-      nonce,
-      code_challenge: pkceChallenge(verifier),
-      code_challenge_method: "S256",
-      max_age: "0",
-      acr_values: "https://world.org/oidc/acr/orb-v3",
     });
     approval.worldApi = {
       request: {
@@ -793,7 +634,7 @@ app.get<{ Params: { id: string } }>(
       response: { status: "pending" },
     };
     saveHistory();
-    return reply.redirect(`${metadata.authorization_endpoint}?${params}`);
+    return reply.redirect(url);
   },
 );
 
@@ -823,26 +664,12 @@ app.get<{
   if (!approval || approval.intentHash !== attempt.intentHash || !isPendingApproval(approval))
     return failure("This approval is no longer pending.");
   try {
-    const metadata = await worldDiscovery();
-    const tokenResponse = await fetch(metadata.token_endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${worldClientId}:${worldClientSecret}`).toString("base64")}`,
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: worldRedirectUri,
-        code_verifier: attempt.verifier,
-      }),
-    });
-    approval.worldApi = { ...approval.worldApi, status: tokenResponse.status };
-    if (!tokenResponse.ok)
-      throw new Error(`World token exchange failed (${tokenResponse.status}).`);
-    const tokens = (await tokenResponse.json()) as { id_token?: string };
-    if (!tokens.id_token) throw new Error("World did not return an ID token.");
-    const claims = await verifyWorldToken(tokens.id_token, attempt.nonce);
+    const exchange = await exchangeWorldCode(code, attempt.verifier);
+    approval.worldApi = { ...approval.worldApi, status: exchange.status };
+    if (exchange.status < 200 || exchange.status >= 300)
+      throw new Error(`World token exchange failed (${exchange.status}).`);
+    if (!exchange.idToken) throw new Error("World did not return an ID token.");
+    const claims = await verifyWorldToken(exchange.idToken, attempt.nonce);
     if (!claims.sub) throw new Error("Verified World identity has no subject.");
     if (!isPendingApproval(approval)) return failure("This approval is no longer pending.");
     approval.status = "approved";

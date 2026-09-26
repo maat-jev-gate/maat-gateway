@@ -30,7 +30,9 @@ gateway/
 ├── server/
 │   ├── app.ts         Fastify API assembly and backend request flow
 │   ├── intercepta.ts  Server-side x402 recipient and token risk checks
-│   └── settings.ts    Server-owned runtime settings and defaults
+│   ├── jev.ts         TypeSafe JEV payment intent evaluation
+│   ├── settings.ts    Server-owned runtime settings and defaults
+│   └── world.ts       World ID OIDC authorization, token exchange, and verification
 ├── src/
 │   ├── App.tsx        Single-column decision stream and development request form
 │   ├── main.tsx       React entry point
@@ -77,7 +79,7 @@ For a blocked demo, use a mainnet address from the pinned Intercepta channel in 
 
 ## JEV decision flow
 
-`server/app.ts` calls `JEV_API_URL` directly with the TypeSafe System One contract. The current question is a boolean `intent_match` question. Thresholds match the project plan:
+`server/jev.ts` calls `JEV_API_URL` with the TypeSafe System One contract; `server/app.ts` applies the result. The current question is a boolean `intent_match` question. Thresholds match the project plan:
 
 - probability `>= 0.80`: `ALLOW`
 - probability `<= 0.30`: `BLOCK`
@@ -91,7 +93,7 @@ Gateway decisions and approvals are saved to the local, Git-ignored `data/histor
 
 ## World ID approval
 
-World ID uses an OIDC authorization code flow with PKCE:
+`server/world.ts` owns the World ID OIDC calls and token checks. `server/app.ts` keeps the approval state and payment release flow:
 
 1. The UI opens `/api/maat/approvals/:id/world/start`.
 2. The Gateway creates `state`, `nonce`, and a PKCE verifier bound to the approval ID and intent hash.
