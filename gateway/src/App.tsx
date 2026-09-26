@@ -50,8 +50,7 @@ export function App() {
   async function applySettings() {
     setError(""); setNotice("");
     try {
-      const response = await fetch("/api/maat/settings", { method: "POST", headers: { Authorization: gatewayAuth(), "Content-Type": "application/json" }, body: JSON.stringify(draft) });
-      if (response.status === 401) gatewayCredentials = "";
+      const response = await fetch("/api/maat/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
       if (!response.ok) throw new Error("Gateway settings could not be applied.");
       const current = await response.json() as Settings;
       setSettings(current); setDraft(current); setNotice("Settings applied on the Gateway server.");

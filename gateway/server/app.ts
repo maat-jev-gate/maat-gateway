@@ -335,10 +335,7 @@ app.get<{ Params: { id: string } }>("/api/maat/decisions/:id", async (request, r
 });
 app.get("/api/world/config", async () => ({ configured: worldConfigured, issuer: worldIssuer, redirectUri: worldRedirectUri }));
 app.get("/api/maat/settings", async () => ({ ...gatewaySettings }));
-app.post<{ Body: Partial<GatewaySettings> }>("/api/maat/settings", async (request, reply) => {
-  if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
-  return reply.send(updateGatewaySettings(request.body ?? {}));
-});
+app.post<{ Body: Partial<GatewaySettings> }>("/api/maat/settings", async (request) => updateGatewaySettings(request.body ?? {}));
 app.post<{ Body: { scenario?: DemoScenario; purpose?: string } }>("/api/maat/demo", async (request, reply) => {
   if (!authorized(request)) return reply.code(401).header("WWW-Authenticate", "Basic realm=maat-gateway").send({ error: "Gateway Basic Auth failed." });
   const scenario = request.body?.scenario;
