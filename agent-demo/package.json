@@ -1,0 +1,25 @@
+{
+  "name": "maat-agent-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -p tsconfig.json && vite build",
+    "start": "vite preview --host 0.0.0.0",
+    "deploy:validate": "node deploy.mjs --validate",
+    "deploy": "node deploy.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}

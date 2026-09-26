@@ -1,0 +1,6 @@
+__DOMAIN__ {
+	encode zstd gzip
+	root * /opt/maat-agent-demo/dist
+	try_files {path} /index.html
+	file_server
+}
