@@ -11,7 +11,7 @@
 
 - Time to first API call: About 30 minutes.
 - Integration experience: The API worked well for screening payment recipients and tokens in the x402 flow.
-- What confused us: We initially could not find a way to reproduce a blocked payment; later, we found the known-risk addresses pinned in Intercepta's Discord channel.
+- What confused us: We initially could not find a way to reproduce a blocked payment. We only found known-risk addresses on the afternoon of Sep 26, in a chat message in the Intercepta partner channel on the ETHGlobal Discord server.
 - What was missing: Consider an API endpoint that lists all known-risk addresses and why they are flagged. It could help integrations that need to discover risky addresses before they have a specific address to scan.
 
 ## Uniswap
