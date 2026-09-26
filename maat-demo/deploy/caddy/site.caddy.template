@@ -1,0 +1,5 @@
+__DOMAIN__ {
+	encode zstd gzip
+	root * __APP_DIR__/dist
+	file_server
+}
