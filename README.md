@@ -31,7 +31,6 @@ DNS should point these hostnames to the deployment server. Caddy terminates HTTP
 | Integration | Call and decision locations |
 | --- | --- |
 | World ID for Agents | [Start OIDC authorization](gateway/server/world.ts#L27), [exchange the code](gateway/server/world.ts#L48), [verify the ID token](gateway/server/world.ts#L67), and [handle approval and payment release](gateway/server/app.ts#L643) |
-| JEV | [Call the TypeSafe evaluation API](gateway/server/jev.ts#L17) and [apply the payment verdict](gateway/server/app.ts#L831); Swap Guard has a [separate swap evaluation](swap-guard/lib/jev.ts#L39) |
 | Uniswap | [Request a Trading API quote](swap-guard/lib/uniswap.ts#L175) or [quote v2/v3 contracts onchain](swap-guard/lib/uniswap.ts#L73); the [Swap Guard decision pipeline](swap-guard/lib/engine.ts#L54) uses the quote for analysis only |
 | Intercepta | [Call the live API](gateway/server/intercepta.ts#L92), [screen the x402 recipient and token](gateway/server/intercepta.ts#L120), and [apply the result before payment signing](gateway/server/app.ts#L798); Swap Guard also [scans tokens](swap-guard/lib/intercepta.ts#L108) |
 
