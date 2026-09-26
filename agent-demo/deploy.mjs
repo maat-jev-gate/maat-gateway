@@ -40,7 +40,7 @@ async function main() {
   if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error("DEPLOY_DOMAIN must be a hostname.");
   if (!/^\/[a-zA-Z0-9/_-]+$/.test(appDir)) throw new Error("REMOTE_APP_DIR must be an absolute path without shell characters.");
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("PORT must be a valid user-space port.");
-  for (const name of ["AGENT_SITE_BASIC_USER", "AGENT_SITE_BASIC_PASSWORD", "GATEWAY_BASIC_USER", "GATEWAY_BASIC_PASSWORD"]) {
+  for (const name of ["GATEWAY_BASIC_USER", "GATEWAY_BASIC_PASSWORD"]) {
     if (!env[name]) throw new Error(`Missing ${name} in .env.`);
   }
   const caddyConfig = await readFile(caddyFile, "utf8");

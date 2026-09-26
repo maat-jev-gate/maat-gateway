@@ -1,9 +1,7 @@
 import { config } from "dotenv";
 import Fastify, { type FastifyReply } from "fastify";
 import fastifyStatic from "@fastify/static";
-import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
 import { steps } from "./src/steps";
 
 config();
@@ -16,28 +14,12 @@ function required(name: string) {
 
 const port = Number(process.env.PORT ?? 8794);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be a valid port.");
-const siteUser = required("AGENT_SITE_BASIC_USER");
-const sitePassword = required("AGENT_SITE_BASIC_PASSWORD");
 const gatewayUser = required("GATEWAY_BASIC_USER");
 const gatewayPassword = required("GATEWAY_BASIC_PASSWORD");
 const gatewayUrl = new URL(process.env.GATEWAY_URL?.trim() || "https://gateway.maat-jev-gate.online/api/maat/pay");
 if (gatewayUrl.protocol !== "https:" || gatewayUrl.pathname !== "/api/maat/pay") throw new Error("GATEWAY_URL must be an HTTPS Gateway pay endpoint.");
 const gatewayAuth = `Basic ${Buffer.from(`${gatewayUser}:${gatewayPassword}`).toString("base64")}`;
 const app = Fastify({ logger: true, bodyLimit: 4_000 });
-
-function matchesBasicAuth(header: string | undefined) {
-  if (!header?.startsWith("Basic ")) return false;
-  const actual = Buffer.from(header.slice(6), "base64");
-  const expected = Buffer.from(`${siteUser}:${sitePassword}`);
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
-
-app.addHook("onRequest", async (request, reply) => {
-  if (request.url === "/health") return;
-  if (!matchesBasicAuth(request.headers.authorization)) {
-    return reply.code(401).header("WWW-Authenticate", 'Basic realm="Maat Agent Demo"').send({ error: "Agent demo authentication required." });
-  }
-});
 
 async function gatewayRequest(path: string, init?: RequestInit) {
   try {
